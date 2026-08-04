@@ -1,0 +1,1985 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CuốcSố — Quản lý thu nhập tài xế</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --font-display:'Be Vietnam Pro', sans-serif;
+    --font-body:'Be Vietnam Pro', sans-serif;
+    --font-mono:'Space Mono', monospace;
+
+    --bg-0:#0a0d18;
+    --bg-1:#10152a;
+    --ink:#f5f3ee;
+    --ink-muted:rgba(245,243,238,.62);
+    --ink-faint:rgba(245,243,238,.4);
+
+    --gold:#f4b740;
+    --gold-soft:#ffd98a;
+    --green:#35d07f;
+    --red:#ff6b6b;
+    --blue:#5aa9ff;
+
+    --glass:rgba(255,255,255,.055);
+    --glass-strong:rgba(255,255,255,.09);
+    --border:rgba(255,255,255,.12);
+    --border-strong:rgba(255,255,255,.2);
+
+    --radius-lg:22px;
+    --radius-md:16px;
+    --radius-sm:11px;
+
+    --sidebar-w:252px;
+    --topbar-h:68px;
+    --bottomnav-h:64px;
+
+    --shadow-card:0 10px 30px -12px rgba(0,0,0,.5);
+
+    /* living background / day-night system (set by JS) */
+    --sky-tint-a:rgba(244,183,64,.14);
+    --sky-tint-b:rgba(90,169,255,.12);
+    --star-op:0;
+    --street-op:0;
+    --sun-x:14%;
+    --sun-y:82%;
+    --sun-op:1;
+    --moon-x:80%;
+    --moon-y:20%;
+    --moon-op:0;
+    --headlight-op:0;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ background:var(--bg-0); color-scheme:dark; }
+  body{
+    margin:0;
+    font-family:var(--font-body);
+    color:var(--ink);
+    background:var(--bg-0);
+    min-height:100vh;
+    -webkit-tap-highlight-color:transparent;
+  }
+  h1,h2,h3,h4{ font-family:var(--font-display); margin:0; }
+  p{ margin:0; }
+  button{ font-family:inherit; }
+  ::selection{ background:var(--gold); color:var(--bg-0); }
+  .num{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+
+  /* ---------------- ambient background (living, subtle day/night) ---------------- */
+  .ambient{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(600px 400px at 12% -8%, var(--sky-tint-a), transparent 60%),
+      radial-gradient(700px 500px at 108% 10%, var(--sky-tint-b), transparent 60%),
+      linear-gradient(180deg, var(--bg-1) 0%, var(--bg-0) 45%);
+    transition:background 3s linear;
+  }
+  .ambient-stars{
+    position:absolute; inset:0 0 55% 0;
+    opacity:var(--star-op);
+    transition:opacity 3s linear;
+  }
+  .ambient-stars .st{
+    position:absolute; background:#fff; border-radius:50%;
+    animation:amb-twinkle 4s ease-in-out infinite;
+  }
+  @keyframes amb-twinkle{ 0%,100%{ opacity:.2; } 50%{ opacity:.85; } }
+  .ambient-particles{ position:absolute; inset:0; overflow:hidden; }
+  .ambient-particles .mote{
+    position:absolute; bottom:-10px; width:3px; height:3px; border-radius:50%;
+    background:var(--gold-soft); opacity:0; filter:blur(.3px);
+    animation:mote-rise linear infinite;
+  }
+  @keyframes mote-rise{
+    0%{ opacity:0; transform:translateY(0) translateX(0); }
+    10%{ opacity:.35; }
+    90%{ opacity:.2; }
+    100%{ opacity:0; transform:translateY(-100vh) translateX(30px); }
+  }
+
+  /* ================= APP SHELL ================= */
+  .app-shell{ position:relative; z-index:1; display:flex; min-height:100vh; }
+
+  /* ---- Sidebar (desktop) ---- */
+  .sidebar{
+    width:var(--sidebar-w);
+    flex-shrink:0;
+    padding:26px 18px;
+    display:flex; flex-direction:column; gap:6px;
+    border-right:1px solid var(--border);
+    background:rgba(255,255,255,.02);
+  }
+  .brand{ display:flex; align-items:center; gap:10px; padding:6px 10px 26px; }
+  .brand .mark{
+    width:36px; height:36px; border-radius:11px;
+    background:linear-gradient(135deg, var(--gold), #ff8a4a);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px;
+  }
+  .brand .name{ font-weight:800; font-size:17px; letter-spacing:-.01em; }
+  .brand .name small{ display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:1.5px; color:var(--ink-faint); font-weight:400; text-transform:uppercase; }
+
+  .nav-item{
+    display:flex; align-items:center; gap:12px;
+    padding:12px 14px;
+    border-radius:var(--radius-sm);
+    color:var(--ink-muted);
+    text-decoration:none;
+    font-size:14.5px; font-weight:600;
+    cursor:pointer;
+    border:1px solid transparent;
+    transition:background .2s, color .2s, border-color .2s;
+  }
+  .nav-item .ic{ font-size:17px; width:20px; text-align:center; }
+  .nav-item:hover{ background:var(--glass); color:var(--ink); }
+  .nav-item.active{
+    background:var(--glass-strong);
+    border-color:var(--border);
+    color:var(--gold-soft);
+  }
+  .sidebar-foot{ margin-top:auto; padding:14px 10px; }
+  .sidebar-foot .card{ padding:16px; }
+  .sidebar-foot .t{ font-size:12.5px; color:var(--ink-muted); line-height:1.5; }
+
+  /* ---- Main column ---- */
+  .main-col{ flex:1; min-width:0; display:flex; flex-direction:column; }
+
+  .topbar{
+    height:var(--topbar-h);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 24px;
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:5;
+    background:rgba(10,13,24,.72);
+    backdrop-filter:blur(14px);
+  }
+  .topbar h1{ font-size:19px; font-weight:800; }
+  .topbar .date{ font-family:var(--font-mono); font-size:12px; color:var(--ink-faint); margin-top:1px; }
+  .topbar-actions{ display:flex; align-items:center; gap:10px; }
+
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid var(--border);
+    background:var(--glass);
+    color:var(--ink);
+    padding:10px 16px;
+    border-radius:999px;
+    font-size:13.5px; font-weight:700;
+    cursor:pointer;
+    transition:transform .15s ease, background .2s, border-color .2s;
+  }
+  .btn:hover{ background:var(--glass-strong); border-color:var(--border-strong); }
+  .btn:active{ transform:scale(.96); }
+  .btn-gold{
+    background:linear-gradient(135deg, var(--gold), #ff9a4a);
+    color:#1a1204; border:none;
+    box-shadow:0 8px 20px -8px rgba(244,183,64,.6);
+  }
+  .btn-gold:hover{ filter:brightness(1.06); }
+  .btn-ghost{ background:transparent; border-color:var(--border); }
+  .btn-block{ width:100%; justify-content:center; }
+  .btn-sm{ padding:7px 12px; font-size:12.5px; }
+  .icon-btn{
+    width:40px; height:40px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:var(--glass); border:1px solid var(--border); color:var(--ink);
+    cursor:pointer; font-size:16px; flex-shrink:0;
+    transition:transform .2s ease, background .2s ease;
+  }
+  .icon-btn:hover{ background:var(--glass-strong); transform:rotate(24deg); }
+  .icon-btn:active{ transform:scale(.92) rotate(24deg); }
+
+  main.pages{ padding:24px; padding-bottom:calc(var(--bottomnav-h) + 32px); max-width:1180px; width:100%; margin:0 auto; }
+  .page{ display:none; }
+  .page.active{ display:block; }
+
+  /* ---------------- reveal / stagger ---------------- */
+  .rv{ opacity:0; transform:translateY(10px); animation:rv .5s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes rv{ to{ opacity:1; transform:translateY(0); } }
+  .rv.d1{ animation-delay:.04s; } .rv.d2{ animation-delay:.08s; } .rv.d3{ animation-delay:.12s; }
+  .rv.d4{ animation-delay:.16s; } .rv.d5{ animation-delay:.2s; } .rv.d6{ animation-delay:.24s; }
+
+  /* ---------------- cards / grids ---------------- */
+  .card{
+    background:var(--glass);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+  }
+  .section-title{ font-size:15px; font-weight:800; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; }
+  .section-title .link{ font-size:12.5px; font-weight:700; color:var(--gold-soft); text-decoration:none; cursor:pointer; }
+  .stack{ display:flex; flex-direction:column; gap:16px; }
+  .row-grid{ display:grid; gap:16px; }
+  .row-2{ grid-template-columns:1.4fr 1fr; }
+  @media (max-width:880px){ .row-2{ grid-template-columns:1fr; } }
+
+  /* ---- dashboard header banner ---- */
+  .banner{
+    position:relative; overflow:hidden;
+    padding:26px 26px;
+    border-radius:var(--radius-lg);
+    background:linear-gradient(120deg, rgba(244,183,64,.16), rgba(90,169,255,.08));
+    min-height:200px;
+  }
+  .banner-content{ position:relative; z-index:3; }
+  .banner .greet{ font-size:clamp(20px,3vw,26px); font-weight:800; }
+  .banner .sub{ color:var(--ink-muted); font-size:13.5px; margin-top:4px; }
+  .banner .actions{ margin-top:18px; display:flex; gap:10px; flex-wrap:wrap; }
+  .banner .today-chip{
+    display:inline-flex; flex-direction:column; gap:2px;
+    margin-top:16px; padding:10px 14px;
+    background:rgba(0,0,0,.18); border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+  }
+  .banner .today-chip .l{ font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-faint); }
+  .banner .today-chip .v{ font-size:18px; font-weight:700; color:var(--gold-soft); }
+
+  .banner-sky{
+    position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:1;
+  }
+  .banner-celestial{
+    position:absolute; border-radius:50%; transform:translate(-50%,-50%);
+  }
+  .banner-sun{
+    width:24px; height:24px; left:var(--sun-x); top:var(--sun-y);
+    background:radial-gradient(circle at 35% 35%, #fff6d9, var(--gold) 55%, #ff8a4a 100%);
+    box-shadow:0 0 24px 6px rgba(244,183,64,.45);
+    opacity:var(--sun-op); transition:left 3s linear, top 3s linear, opacity 2s linear;
+  }
+  .banner-moon{
+    width:16px; height:16px; left:var(--moon-x); top:var(--moon-y);
+    background:radial-gradient(circle at 38% 35%, #fff, #dfe4f2 60%, #b8c0dd 100%);
+    box-shadow:0 0 16px 4px rgba(220,225,245,.35);
+    opacity:var(--moon-op); transition:left 3s linear, top 3s linear, opacity 2s linear;
+  }
+  .banner-bird, .banner-plane, .banner-leaf{
+    position:absolute; pointer-events:none; opacity:.75; will-change:transform;
+  }
+  .banner-bird{ top:14%; font-size:10px; animation:fly-across linear forwards; }
+  .banner-plane{ top:8%; font-size:12px; animation:fly-across linear forwards; opacity:.5; }
+  .banner-leaf{ top:22%; font-size:11px; animation:leaf-fall linear forwards; }
+  @keyframes fly-across{ from{ left:-6%; } to{ left:106%; } }
+  @keyframes leaf-fall{
+    0%{ left:-4%; top:18%; transform:rotate(0deg); opacity:0; }
+    12%{ opacity:.7; }
+    100%{ left:58%; top:68%; transform:rotate(220deg); opacity:0; }
+  }
+  .banner-trees{
+    position:absolute; left:0; right:0; bottom:32px; height:20px;
+    background-image:repeating-linear-gradient(90deg, rgba(20,26,51,.5) 0 6px, transparent 6px 34px);
+    opacity:.5; z-index:1;
+  }
+  .road-strip{
+    position:absolute; left:0; right:0; bottom:0; height:34px;
+    background:linear-gradient(180deg, transparent, rgba(0,0,0,.28));
+    overflow:hidden; z-index:2;
+  }
+  .road-strip .line{
+    position:absolute; bottom:14px; left:-160px; right:0; height:2px; width:calc(100% + 160px);
+    background-image:repeating-linear-gradient(90deg, rgba(255,255,255,.35) 0 16px, transparent 16px 32px);
+    animation:line-slide 1.6s linear infinite;
+  }
+  @keyframes line-slide{ to{ transform:translateX(160px); } }
+  .street-lamps{ position:absolute; inset:0; opacity:var(--street-op); transition:opacity 2s linear; }
+  .street-lamps span{
+    position:absolute; top:2px; width:5px; height:5px; border-radius:50%;
+    background:#ffe9b0; box-shadow:0 0 10px 4px rgba(255,233,176,.7);
+  }
+  .traffic-veh{ position:absolute; bottom:6px; pointer-events:none; will-change:left; }
+  .traffic-veh .em{ display:block; filter:drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
+  .mini-car{ position:absolute; bottom:6px; width:64px; animation:drive 13s linear infinite; z-index:2; }
+  .mini-car svg{ width:100%; display:block; overflow:visible; }
+  .mini-wheel{ transform-box:fill-box; transform-origin:center; animation:spin .55s linear infinite; }
+  .headlight-dyn{ opacity:var(--headlight-op); transition:opacity 2s linear; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  /* the mini-car loops forever: drive right, flip while off-screen, drive back, unflip while off-screen.
+     transform is pinned at 0%/48% so it never interpolates through the visible middle of the trip —
+     only the 48%->50% and 98%->100% windows (when left is 104%/-8%, fully off-screen) actually flip. */
+  @keyframes drive{
+    0%{ left:-8%; transform:scaleX(1); }
+    48%{ left:104%; transform:scaleX(1); }
+    50%{ left:104%; transform:scaleX(-1); }
+    98%{ left:-8%; transform:scaleX(-1); }
+    100%{ left:-8%; transform:scaleX(1); }
+  }
+  /* one-way passes for spawned traffic — no flip keyframes at all, so no squish is possible */
+  @keyframes drive-once{ from{ left:-10%; } to{ left:104%; } }
+  @keyframes drive-once-rev{ from{ left:104%; } to{ left:-10%; } }
+
+  /* ---- KPI cards ---- */
+  .kpi-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+  @media (max-width:960px){ .kpi-grid{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:480px){ .kpi-grid{ grid-template-columns:1fr; } }
+  .kpi{ padding:18px 20px; transition:transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease; }
+  .kpi:hover{ transform:translateY(-3px); box-shadow:0 14px 28px -14px rgba(0,0,0,.55); }
+  .kpi .l{ font-size:12.5px; color:var(--ink-muted); font-weight:600; }
+  .kpi .v{ font-size:clamp(20px,2.4vw,26px); font-weight:700; color:var(--ink); margin-top:8px; }
+  .kpi .v.gold{ color:var(--gold-soft); }
+  .kpi .v.green{ color:var(--green); }
+  .kpi .delta{ font-size:12px; margin-top:6px; color:var(--ink-faint); }
+
+  /* ---- transactions list ---- */
+  .tx-list{ display:flex; flex-direction:column; }
+  .tx-row{
+    display:flex; align-items:center; gap:12px;
+    padding:13px 4px; border-bottom:1px solid var(--border);
+    border-radius:10px; transition:background .2s ease, transform .2s ease;
+  }
+  .tx-row:last-child{ border-bottom:none; }
+  .tx-row:hover{ background:var(--glass); transform:translateX(2px); }
+  .tx-ic{
+    width:38px; height:38px; border-radius:11px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--glass-strong); font-size:16px; flex-shrink:0;
+    transition:transform .2s ease;
+  }
+  .tx-row:hover .tx-ic{ transform:scale(1.08) rotate(-4deg); }
+  .tx-mid{ flex:1; min-width:0; }
+  .tx-mid .t{ font-size:14px; font-weight:700; }
+  .tx-mid .d{ font-size:12px; color:var(--ink-faint); margin-top:2px; }
+  .tx-amt{ font-size:14.5px; font-weight:700; white-space:nowrap; }
+  .tx-amt.income{ color:var(--green); }
+  .tx-amt.expense{ color:var(--red); }
+  .empty-state{ padding:30px 10px; text-align:center; color:var(--ink-faint); font-size:13.5px; }
+  .empty-illus{
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:42px 18px 34px;
+    opacity:0; animation:rv .5s cubic-bezier(.2,.7,.2,1) forwards;
+  }
+  .empty-illus .glyph{
+    width:74px; height:74px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, rgba(244,183,64,.35), rgba(244,183,64,.06));
+    border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-size:32px; margin-bottom:16px;
+    animation:empty-float 3.4s ease-in-out infinite;
+  }
+  @keyframes empty-float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+  .empty-illus .t{ font-size:15px; font-weight:800; }
+  .empty-illus .s{ font-size:13px; color:var(--ink-muted); margin-top:6px; max-width:280px; }
+  .empty-illus .btn{ margin-top:18px; padding:13px 22px; font-size:14px; animation:cta-pulse 2.4s ease-in-out infinite; }
+  @keyframes cta-pulse{ 0%,100%{ box-shadow:0 8px 20px -8px rgba(244,183,64,.6); } 50%{ box-shadow:0 8px 28px -6px rgba(244,183,64,.9); } }
+
+  /* ---- vehicle ring + maintenance ---- */
+  .ring-card{ padding:22px; display:flex; align-items:center; gap:18px; }
+  .ring{ width:88px; height:88px; flex-shrink:0; }
+  .ring circle{ fill:none; stroke-width:8; }
+  .ring .bg{ stroke:rgba(255,255,255,.1); }
+  .ring .fg{ stroke:var(--gold); stroke-linecap:round; transform:rotate(-90deg); transform-origin:50% 50%; transition:stroke-dashoffset 1s cubic-bezier(.2,.7,.2,1); }
+  .ring-label{ text-anchor:middle; }
+  .ring-wrap{ position:relative; }
+  .ring-pct{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-weight:700; font-size:16px; }
+  .ring-info .t{ font-weight:800; font-size:15px; }
+  .ring-info .s{ font-size:12.5px; color:var(--ink-muted); margin-top:4px; }
+
+  .maint-list{ display:flex; flex-direction:column; gap:10px; }
+  .maint-row{ display:flex; align-items:center; gap:12px; padding:8px 2px; }
+  .maint-row .tx-ic{ background:var(--glass-strong); }
+  .maint-row .t{ font-size:13.5px; font-weight:700; }
+  .badge{ font-family:var(--font-mono); font-size:11px; font-weight:700; padding:4px 9px; border-radius:999px; white-space:nowrap; }
+  .badge.ok{ background:rgba(53,208,127,.15); color:var(--green); }
+  .badge.unset{ background:rgba(255,255,255,.08); color:var(--ink-faint); }
+  .badge.soon{ background:rgba(244,183,64,.18); color:var(--gold-soft); animation:badge-pulse 2.6s ease-in-out infinite; }
+  .badge.overdue{ background:rgba(255,107,107,.16); color:var(--red); animation:badge-pulse 2.6s ease-in-out infinite; }
+  @keyframes badge-pulse{ 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:.78; transform:scale(1.035); } }
+
+  /* ---- quick stats ---- */
+  .qs-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  @media (max-width:640px){ .qs-grid{ grid-template-columns:1fr; } }
+  .qs{ padding:18px 20px; text-align:center; }
+  .qs .v{ font-size:22px; font-weight:700; color:var(--gold-soft); }
+  .qs .l{ font-size:12px; color:var(--ink-muted); margin-top:4px; }
+
+  /* ---- quick actions ---- */
+  .qa-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  @media (max-width:640px){ .qa-grid{ grid-template-columns:repeat(2,1fr); } }
+  .qa{
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    padding:18px 10px; cursor:pointer;
+    transition:transform .15s ease, background .2s;
+  }
+  .qa:hover{ background:var(--glass-strong); transform:translateY(-2px); }
+  .qa:active{ transform:scale(.97); }
+  .qa .ic{ font-size:22px; }
+  .qa .t{ font-size:12.5px; font-weight:700; text-align:center; }
+
+  /* ---------------- Statistics page ---------------- */
+  .tabs{ display:inline-flex; gap:4px; padding:4px; background:var(--glass); border:1px solid var(--border); border-radius:999px; }
+  .tab{
+    border:none; background:transparent; color:var(--ink-muted);
+    padding:8px 16px; border-radius:999px; font-size:13px; font-weight:700; cursor:pointer;
+    transition:background .2s, color .2s;
+  }
+  .tab.active{ background:var(--gold); color:#1a1204; }
+  .chart-card{ padding:22px; margin-top:18px; }
+  .chart-summary{ display:flex; gap:24px; flex-wrap:wrap; margin-bottom:18px; }
+  .chart-summary .item .l{ font-size:12px; color:var(--ink-muted); }
+  .chart-summary .item .v{ font-size:19px; font-weight:700; margin-top:3px; }
+  .chart-wrap{ position:relative; height:280px; }
+  .legend-dot{ display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:6px; }
+
+  /* ---------------- Transactions page ---------------- */
+  .filter-row{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+
+  /* ---------------- FAB + bottom nav ---------------- */
+  .fab{
+    position:fixed; z-index:15; right:22px; bottom:calc(var(--bottomnav-h) + 18px);
+    width:58px; height:58px; border-radius:50%;
+    background:linear-gradient(135deg, var(--gold), #ff9a4a);
+    display:none; align-items:center; justify-content:center;
+    font-size:26px; color:#1a1204; border:none; cursor:pointer;
+    box-shadow:0 10px 26px -8px rgba(244,183,64,.7);
+    transition:transform .15s ease;
+  }
+  .fab:active{ transform:scale(.92); }
+
+  .bottomnav{
+    display:none;
+    position:fixed; left:0; right:0; bottom:0; z-index:14;
+    height:calc(var(--bottomnav-h) + env(safe-area-inset-bottom));
+    padding-bottom:env(safe-area-inset-bottom);
+    background:rgba(10,13,24,.86);
+    backdrop-filter:blur(16px);
+    border-top:1px solid var(--border);
+    align-items:stretch;
+    justify-content:space-around;
+  }
+  .bn-item{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    background:none; border:none; color:var(--ink-faint); cursor:pointer; padding:6px 2px;
+  }
+  .bn-item .ic{ font-size:19px; }
+  .bn-item .t{ font-size:10px; font-weight:700; letter-spacing:.2px; }
+  .bn-item.active{ color:var(--gold-soft); }
+
+  @media (max-width:960px){
+    .sidebar{ display:none; }
+    .bottomnav{ display:flex; }
+    .fab{ display:flex; }
+    main.pages{ padding:16px; padding-bottom:calc(var(--bottomnav-h) + 100px); }
+    .topbar{ padding:0 16px; }
+  }
+
+  /* ---------------- Modal ---------------- */
+  .modal-backdrop{
+    position:fixed; inset:0; z-index:30;
+    background:rgba(4,5,10,.6);
+    backdrop-filter:blur(4px);
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal{
+    width:100%; max-width:480px;
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    border-bottom:none;
+    border-radius:24px 24px 0 0;
+    padding:22px 22px calc(22px + env(safe-area-inset-bottom));
+    max-height:88vh; overflow-y:auto;
+    transform:translateY(24px); opacity:0;
+    transition:transform .28s cubic-bezier(.2,.8,.2,1), opacity .28s ease;
+  }
+  .modal-backdrop.open .modal{ transform:translateY(0); opacity:1; }
+  @media (min-width:640px){
+    .modal-backdrop{ align-items:center; }
+    .modal{ border-radius:24px; border-bottom:1px solid var(--border); }
+  }
+  .modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .modal-head h3{ font-size:18px; font-weight:800; }
+  .modal-close{ background:var(--glass); border:1px solid var(--border); width:32px; height:32px; border-radius:50%; color:var(--ink); cursor:pointer; font-size:15px; }
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:12.5px; font-weight:700; color:var(--ink-muted); margin-bottom:6px; }
+  .field input, .field textarea, .field select{
+    width:100%; background:rgba(255,255,255,.06); border:1px solid var(--border);
+    color:var(--ink); padding:12px 13px; border-radius:var(--radius-sm); font-size:15px;
+    font-family:var(--font-body);
+  }
+  .field input:focus, .field textarea:focus, .field select:focus{ outline:none; border-color:var(--gold); background:rgba(255,255,255,.09); }
+  .field textarea{ resize:vertical; min-height:64px; font-family:var(--font-body); }
+  .field select{ color-scheme:dark; }
+  .field select option{ background:var(--bg-1); color:var(--ink); }
+  .modal-total{
+    display:flex; justify-content:space-between; align-items:center;
+    background:rgba(244,183,64,.1); border:1px solid rgba(244,183,64,.25);
+    border-radius:var(--radius-sm); padding:12px 14px; margin:16px 0;
+  }
+  .modal-total .l{ font-size:13px; color:var(--ink-muted); }
+  .modal-total .v{ font-size:19px; font-weight:700; color:var(--gold-soft); }
+  .modal-actions{ display:flex; gap:10px; margin-top:6px; }
+  .modal-actions .btn{ flex:1; }
+
+  .settings-info{ font-size:13px; color:var(--ink-muted); line-height:1.6; margin-bottom:20px; }
+  .danger-zone{
+    border:1px solid rgba(255,107,107,.3);
+    background:rgba(255,107,107,.06);
+    border-radius:var(--radius-md);
+    padding:16px;
+  }
+  .danger-zone .t{ font-size:13px; font-weight:800; color:var(--red); }
+  .danger-zone .s{ font-size:12.5px; color:var(--ink-muted); margin:6px 0 14px; line-height:1.55; }
+  .btn-danger{
+    background:rgba(255,107,107,.14); color:var(--red); border:1px solid rgba(255,107,107,.35);
+  }
+  .btn-danger:hover{ background:rgba(255,107,107,.22); }
+
+  .confirm-modal .modal{ max-width:400px; text-align:center; padding:28px 24px calc(24px + env(safe-area-inset-bottom)); }
+  .confirm-modal .warn-ic{
+    width:56px; height:56px; margin:0 auto 14px; border-radius:50%;
+    background:rgba(255,107,107,.14); display:flex; align-items:center; justify-content:center; font-size:26px;
+  }
+  .confirm-modal h3{ font-size:17px; font-weight:800; margin-bottom:8px; }
+  .confirm-modal p{ font-size:13.5px; color:var(--ink-muted); line-height:1.6; }
+  .confirm-modal .modal-actions{ margin-top:20px; }
+
+  /* money particles on save */
+  .money-particle{
+    position:fixed; z-index:50; pointer-events:none;
+    font-family:var(--font-mono); font-weight:700; font-size:13px; color:var(--gold-soft);
+    animation:money-rise 1.1s ease-out forwards;
+  }
+  @keyframes money-rise{
+    0%{ opacity:0; transform:translate(0,0) scale(.7); }
+    15%{ opacity:1; transform:translate(var(--mx,0), -14px) scale(1); }
+    100%{ opacity:0; transform:translate(var(--mx,0), -80px) scale(1); }
+  }
+
+  /* ---------------- toast ---------------- */
+  .toast-host{ position:fixed; left:0; right:0; bottom:calc(var(--bottomnav-h) + 16px); z-index:40; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; }
+  @media (min-width:960px){ .toast-host{ bottom:24px; } }
+  .toast{
+    background:var(--bg-1); border:1px solid var(--border-strong);
+    padding:11px 18px; border-radius:999px; font-size:13.5px; font-weight:700;
+    display:flex; align-items:center; gap:8px;
+    box-shadow:0 12px 30px -10px rgba(0,0,0,.6);
+    animation:toastIn .25s cubic-bezier(.2,.8,.2,1), toastOut .25s ease 2.2s forwards;
+  }
+  @keyframes toastIn{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
+  @keyframes toastOut{ to{ opacity:0; transform:translateY(-6px); } }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:.001s !important; animation-iteration-count:1 !important; }
+  }
+
+  a{ color:inherit; }
+  .scroll-hidden{ overflow:hidden; }
+</style>
+</head>
+<body>
+
+<div class="ambient">
+  <div class="ambient-stars" id="ambientStars"></div>
+  <div class="ambient-particles" id="ambientParticles"></div>
+</div>
+
+<div class="app-shell">
+
+  <!-- ============ SIDEBAR (desktop) ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">🚕</div>
+      <div class="name">CuốcSố<small>Ví tài xế</small></div>
+    </div>
+    <nav id="sideNav">
+      <div class="nav-item active" data-page="dashboard"><span class="ic">🏠</span> Tổng quan</div>
+      <div class="nav-item" data-page="stats"><span class="ic">📊</span> Thống kê</div>
+      <div class="nav-item" data-page="transactions"><span class="ic">🧾</span> Giao dịch</div>
+      <div class="nav-item" data-page="vehicle"><span class="ic">🚗</span> Xe của tôi</div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="card">
+        <p class="t">Ghi lại mỗi cuốc xe chỉ trong vài giây — dữ liệu lưu ngay trên trình duyệt của bạn.</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main-col">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Tổng quan</h1>
+        <div class="date" id="pageDate">—</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="openSettings" title="Cài đặt">⚙️</button>
+        <button class="btn btn-ghost" id="addExpenseBtnTop" style="display:none">+ Chi phí</button>
+        <button class="btn btn-gold" id="addIncomeBtnTop">+ Thêm thu nhập</button>
+      </div>
+    </header>
+
+    <main class="pages">
+
+      <!-- ================= DASHBOARD ================= -->
+      <section class="page active" id="page-dashboard">
+        <div class="stack">
+
+          <div class="banner card rv">
+            <div class="banner-content">
+              <div class="greet" id="greetText">Chào buổi sáng 👋</div>
+              <div class="sub">Chúc anh một ngày chạy xe an toàn và nhiều cuốc đẹp.</div>
+              <div class="actions">
+                <button class="btn btn-gold" id="bannerAddIncome">+ Thêm thu nhập hôm nay</button>
+                <button class="btn btn-ghost" data-nav="stats">Xem thống kê</button>
+              </div>
+              <div class="today-chip">
+                <div class="l">Hôm nay</div>
+                <div class="v num" id="chipToday">0đ</div>
+              </div>
+            </div>
+            <div class="banner-sky" id="bannerSky">
+              <div class="banner-celestial banner-sun"></div>
+              <div class="banner-celestial banner-moon"></div>
+            </div>
+            <div class="banner-trees"></div>
+            <div class="road-strip" id="roadStrip">
+              <div class="line"></div>
+              <div class="street-lamps">
+                <span style="left:12%"></span><span style="left:38%"></span><span style="left:64%"></span><span style="left:89%"></span>
+              </div>
+              <div class="mini-car">
+                <svg viewBox="0 0 220 100" fill="none">
+                  <ellipse class="headlight-dyn" cx="206" cy="60" rx="20" ry="11" fill="#fff3c9" opacity="0"/>
+                  <path d="M14 70 C10 45 30 40 46 38 L64 22 C70 16 80 13 92 13 L146 13 C158 13 168 18 174 27 L188 40 C202 42 210 50 210 62 L210 70 C210 76 205 80 199 80 L18 80 C10 80 6 76 6 70 Z" fill="#e8672e"/>
+                  <path d="M70 38 L80 22 C84 17 90 15 96 15 L140 15 C148 15 154 19 158 26 L166 38 Z" fill="#ffd98a" opacity=".85"/>
+                  <rect x="6" y="66" width="204" height="8" fill="#c9541f"/>
+                  <circle cx="55" cy="80" r="16" fill="#1c1c22"/>
+                  <circle class="mini-wheel" cx="55" cy="80" r="16" fill="none" stroke="#5a5a66" stroke-width="3" stroke-dasharray="4 6"/>
+                  <circle cx="170" cy="80" r="16" fill="#1c1c22"/>
+                  <circle class="mini-wheel" cx="170" cy="80" r="16" fill="none" stroke="#5a5a66" stroke-width="3" stroke-dasharray="4 6"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="card rv" id="maintAlertBanner" style="display:none; padding:14px 18px; border-color:rgba(244,183,64,.35); background:rgba(244,183,64,.08); cursor:pointer;"></div>
+
+          <div class="kpi-grid">
+            <div class="card kpi rv d1"><div class="l">Thu nhập hôm nay</div><div class="v num gold" id="kpiToday">0đ</div></div>
+            <div class="card kpi rv d2"><div class="l">Thu nhập tháng này</div><div class="v num" id="kpiMonth">0đ</div></div>
+            <div class="card kpi rv d3"><div class="l">Thu nhập năm nay</div><div class="v num" id="kpiYear">0đ</div></div>
+            <div class="card kpi rv d4"><div class="l">Lợi nhuận hôm nay</div><div class="v num green" id="kpiProfit">0đ</div></div>
+          </div>
+
+          <div class="row-grid row-2">
+            <div class="card rv d2" style="padding:20px 22px;">
+              <div class="section-title">Giao dịch gần đây <span class="link" data-nav="transactions">Xem tất cả</span></div>
+              <div class="tx-list" id="recentTxList"></div>
+            </div>
+            <div class="stack">
+              <div class="card ring-card rv d3">
+                <div class="ring-wrap">
+                  <svg class="ring" viewBox="0 0 100 100">
+                    <circle class="bg" cx="50" cy="50" r="42"/>
+                    <circle class="fg" id="vehicleRing" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="264"/>
+                  </svg>
+                  <div class="ring-pct num" id="vehiclePct">0%</div>
+                </div>
+                <div class="ring-info">
+                  <div class="t">Tình trạng xe</div>
+                  <div class="s" id="vehicleName">—</div>
+                </div>
+              </div>
+              <div class="card rv d4" style="padding:20px 22px;">
+                <div class="section-title">Bảo dưỡng sắp tới <span class="link" data-nav="vehicle">Chi tiết</span></div>
+                <div class="maint-list" id="upcomingMaint"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rv d3">
+            <div class="section-title">Thống kê nhanh</div>
+            <div class="qs-grid">
+              <div class="card qs"><div class="v num" id="qsAvg">0đ</div><div class="l">Trung bình / ngày (7 ngày)</div></div>
+              <div class="card qs"><div class="v num" id="qsCount">0</div><div class="l">Tổng số cuốc đã ghi</div></div>
+              <div class="card qs"><div class="v num" id="qsBest">0đ</div><div class="l">Ngày thu nhập cao nhất (30 ngày)</div></div>
+            </div>
+          </div>
+
+          <div class="rv d4">
+            <div class="section-title">Thao tác nhanh</div>
+            <div class="qa-grid">
+              <div class="card qa" id="qaIncome"><span class="ic">💰</span><span class="t">Thêm thu nhập</span></div>
+              <div class="card qa" id="qaExpense"><span class="ic">💸</span><span class="t">Thêm chi phí</span></div>
+              <div class="card qa" data-nav="stats"><span class="ic">📈</span><span class="t">Xem thống kê</span></div>
+              <div class="card qa" data-nav="vehicle"><span class="ic">🔧</span><span class="t">Quản lý xe</span></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= STATISTICS ================= -->
+      <section class="page" id="page-stats">
+        <div class="tabs" id="periodTabs">
+          <button class="tab active" data-period="week">Tuần</button>
+          <button class="tab" data-period="month">Tháng</button>
+          <button class="tab" data-period="year">Năm</button>
+        </div>
+        <div class="card chart-card rv">
+          <div class="chart-summary">
+            <div class="item"><div class="l"><span class="legend-dot" style="background:var(--green)"></span>Thu nhập</div><div class="v num" id="statIncome">0đ</div></div>
+            <div class="item"><div class="l"><span class="legend-dot" style="background:var(--red)"></span>Chi phí</div><div class="v num" id="statExpense">0đ</div></div>
+            <div class="item"><div class="l"><span class="legend-dot" style="background:var(--gold)"></span>Lợi nhuận</div><div class="v num" id="statProfit">0đ</div></div>
+          </div>
+          <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+        </div>
+      </section>
+
+      <!-- ================= TRANSACTIONS ================= -->
+      <section class="page" id="page-transactions">
+        <div class="filter-row" id="txFilters">
+          <button class="tab active" data-filter="all">Tất cả</button>
+          <button class="tab" data-filter="income">Thu nhập</button>
+          <button class="tab" data-filter="expense">Chi phí</button>
+        </div>
+        <div class="card rv" style="padding:8px 18px;">
+          <div class="tx-list" id="fullTxList"></div>
+        </div>
+      </section>
+
+      <!-- ================= VEHICLE ================= -->
+      <section class="page" id="page-vehicle">
+        <div class="card rv" style="padding:22px;">
+          <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
+            <svg class="ring" viewBox="0 0 100 100" style="width:96px;height:96px;">
+              <circle class="bg" cx="50" cy="50" r="42"/>
+              <circle class="fg" id="vehicleRing2" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="264"/>
+            </svg>
+            <div style="flex:1; min-width:160px;">
+              <div style="font-size:19px; font-weight:800;" id="vehicleName2">—</div>
+              <div style="color:var(--ink-muted); font-size:13.5px; margin-top:4px;" id="vehiclePlate">—</div>
+              <div style="color:var(--ink-faint); font-size:12.5px; margin-top:2px;" class="num" id="vehicleOdo">—</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="editVehicleInfoBtn">✎ Sửa thông tin</button>
+          </div>
+        </div>
+        <div class="rv d1" style="margin-top:18px;">
+          <div class="section-title">Lịch bảo dưỡng <span class="link" style="font-weight:400; color:var(--ink-faint);">Bấm vào từng mục để nhập ngày</span></div>
+          <div class="row-grid" style="grid-template-columns:repeat(2,1fr);" id="maintGrid"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ============ Mobile bottom nav + FAB ============ -->
+<button class="fab" id="fabAdd">+</button>
+<nav class="bottomnav" id="bottomNav">
+  <button class="bn-item active" data-page="dashboard"><span class="ic">🏠</span><span class="t">Tổng quan</span></button>
+  <button class="bn-item" data-page="stats"><span class="ic">📊</span><span class="t">Thống kê</span></button>
+  <button class="bn-item" data-page="transactions"><span class="ic">🧾</span><span class="t">Giao dịch</span></button>
+  <button class="bn-item" data-page="vehicle"><span class="ic">🚗</span><span class="t">Xe</span></button>
+</nav>
+
+<!-- ============ Modals ============ -->
+<div class="modal-backdrop" id="incomeModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="incomeModalTitle">Thêm thu nhập</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="field"><label>Thu nhập từ app (đ)</label><input type="number" inputmode="numeric" id="inApp" placeholder="0"></div>
+    <div class="field"><label>Tiền mặt (đ)</label><input type="number" inputmode="numeric" id="inCash" placeholder="0"></div>
+    <div class="field"><label>Chuyển khoản (đ)</label><input type="number" inputmode="numeric" id="inBank" placeholder="0"></div>
+    <div class="field"><label>Tiền tip (đ)</label><input type="number" inputmode="numeric" id="inTip" placeholder="0"></div>
+    <div class="field"><label>Ghi chú</label><textarea id="inNote" placeholder="Ví dụ: ca sáng, khu vực quận 1..."></textarea></div>
+    <div class="modal-total"><div class="l">Tổng cộng</div><div class="v num" id="inTotal">0đ</div></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>Hủy</button>
+      <button class="btn btn-gold" id="saveIncome">Lưu</button>
+    </div>
+    <button class="btn btn-danger btn-block" id="deleteIncomeBtn" style="margin-top:10px; display:none;">🗑 Xóa giao dịch này</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="expenseModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="expenseModalTitle">Thêm chi phí</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="field"><label>Số tiền (đ)</label><input type="number" inputmode="numeric" id="exAmount" placeholder="0"></div>
+    <div class="field"><label>Danh mục</label>
+      <select id="exCategory">
+        <option>Xăng</option><option>Sạc điện</option><option>Gửi xe</option><option>Bãi đỗ xe</option>
+        <option>Rửa xe</option><option>Vệ sinh xe</option><option>Ăn uống</option>
+        <option>Bảo dưỡng</option><option>Phí ứng dụng</option><option>Khác</option>
+      </select>
+    </div>
+    <div class="field"><label>Ghi chú</label><textarea id="exNote" placeholder="Không bắt buộc"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>Hủy</button>
+      <button class="btn btn-gold" id="saveExpense">Lưu</button>
+    </div>
+    <button class="btn btn-danger btn-block" id="deleteExpenseBtn" style="margin-top:10px; display:none;">🗑 Xóa giao dịch này</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="vehicleInfoModal">
+  <div class="modal">
+    <div class="modal-head"><h3>Thông tin xe</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="field"><label>Tên xe</label><input type="text" id="vfName" placeholder="Ví dụ: Toyota Vios 2021"></div>
+    <div class="field"><label>Biển số</label><input type="text" id="vfPlate" placeholder="Ví dụ: 51H1 - 234.56"></div>
+    <div class="field"><label>Số km hiện tại</label><input type="number" inputmode="numeric" id="vfOdo" placeholder="0"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>Hủy</button>
+      <button class="btn btn-gold" id="saveVehicleInfo">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="maintDateModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="maintDateTitle">Ngày bảo dưỡng</h3><button class="modal-close" data-close>✕</button></div>
+    <div class="field"><label>Ngày đến hạn tiếp theo</label><input type="date" id="mdDate"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>Hủy</button>
+      <button class="btn btn-gold" id="saveMaintDate">Lưu</button>
+    </div>
+    <button class="btn btn-danger btn-block" id="clearMaintDate" style="margin-top:10px; display:none;">🗑 Xóa ngày đã lưu</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal">
+    <div class="modal-head"><h3>Cài đặt</h3><button class="modal-close" data-close>✕</button></div>
+    <p class="settings-info" id="settingsInfo">CuốcSố lưu toàn bộ dữ liệu ngay trên trình duyệt của anh — không có máy chủ nào khác nhìn thấy con số này.</p>
+    <div class="danger-zone" id="accountZone" style="display:none; margin-bottom:16px; border-color:rgba(90,169,255,.3); background:rgba(90,169,255,.06);">
+      <div class="t" style="color:var(--blue);">Tài khoản &amp; đồng bộ</div>
+      <div class="s" id="accountStatus">—</div>
+      <button class="btn btn-ghost btn-block" id="logoutBtn" style="display:none;">Đăng xuất</button>
+    </div>
+    <div class="danger-zone">
+      <div class="t">Vùng nguy hiểm</div>
+      <div class="s">Xoá toàn bộ thu nhập, chi phí, thống kê và dữ liệu xe đã lưu. Hành động không thể hoàn tác.</div>
+      <button class="btn btn-danger btn-block" id="openResetConfirm">Đặt lại toàn bộ dữ liệu</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop confirm-modal" id="resetConfirmModal">
+  <div class="modal">
+    <div class="warn-ic">⚠️</div>
+    <h3>Bạn chắc chắn muốn xóa toàn bộ dữ liệu?</h3>
+    <p>Hành động này sẽ xóa toàn bộ doanh thu, thống kê, chi phí, lịch bảo dưỡng và mọi dữ liệu đã lưu. Không thể hoàn tác.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>Hủy</button>
+      <button class="btn btn-danger" id="confirmReset">Xóa tất cả</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="authGate" style="z-index:70; align-items:center;">
+  <div class="modal" style="max-width:380px; border-radius:24px; border-bottom:1px solid var(--border);">
+    <div style="text-align:center; margin-bottom:20px;">
+      <div style="font-size:34px;">🚕</div>
+      <h3 style="margin-top:8px;">CuốcSố</h3>
+      <p style="font-size:13px; color:var(--ink-muted); margin-top:4px;" id="authSubtitle">Đăng nhập để đồng bộ dữ liệu của anh trên mọi thiết bị.</p>
+    </div>
+    <div class="field"><label>Email</label><input type="email" id="authEmail" placeholder="ban@email.com" autocomplete="email"></div>
+    <div class="field"><label>Mật khẩu</label><input type="password" id="authPassword" placeholder="Tối thiểu 6 ký tự" autocomplete="current-password"></div>
+    <div id="authError" style="display:none; font-size:12.5px; color:var(--red); margin-bottom:12px; line-height:1.5;"></div>
+    <button class="btn btn-gold btn-block" id="authSubmit">Đăng nhập</button>
+    <div style="text-align:center; margin-top:16px; font-size:12.5px; color:var(--ink-muted);">
+      <span id="authToggleText">Chưa có tài khoản?</span> <a href="#" id="authToggleLink" style="color:var(--gold-soft); font-weight:700; text-decoration:none;">Đăng ký ngay</a>
+    </div>
+    <div style="text-align:center; margin-top:10px;">
+      <a href="#" id="authForgotLink" style="font-size:12px; color:var(--ink-faint); text-decoration:none;">Quên mật khẩu?</a>
+    </div>
+  </div>
+</div>
+
+<div class="toast-host" id="toastHost"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ================= storage (localStorage with safe in-memory fallback) ================= */
+  var memoryFallback = {};
+  function sSet(key, value){
+    memoryFallback[key] = value;
+    try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
+  }
+  function sGet(key, fallback){
+    if (key in memoryFallback) return memoryFallback[key];
+    try{
+      var raw = localStorage.getItem(key);
+      if (raw !== null){ var parsed = JSON.parse(raw); memoryFallback[key]=parsed; return parsed; }
+    }catch(e){}
+    return fallback;
+  }
+
+  /* ================= helpers ================= */
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  function fmtVND(n){ n = Math.round(n||0); return n.toLocaleString('vi-VN') + 'đ'; }
+  function dayMs(){ return 86400000; }
+  function startOfDay(d){ var x=new Date(d); x.setHours(0,0,0,0); return x; }
+  function isoDay(d){ var x=startOfDay(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
+  function addDays(d,n){ return new Date(d.getTime()+n*dayMs()); }
+  function ddmm(d){ return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
+  var monthNames = ['Th1','Th2','Th3','Th4','Th5','Th6','Th7','Th8','Th9','Th10','Th11','Th12'];
+
+  function seededRandom(seed){
+    var s = seed % 2147483647; if (s<=0) s += 2147483646;
+    return function(){ s = (s*16807) % 2147483647; return (s-1)/2147483646; };
+  }
+
+  /* ================= seed demo data (only used on first run) ================= */
+  function buildSeedTransactions(){
+    var rnd = seededRandom(20260730);
+    var list = [];
+    var today = startOfDay(new Date());
+    for (var i=60; i>=1; i--){
+      var d = addDays(today, -i);
+      var app = Math.round((260000 + rnd()*260000)/1000)*1000;
+      var cash = Math.round((80000 + rnd()*140000)/1000)*1000;
+      var bank = Math.round((60000 + rnd()*160000)/1000)*1000;
+      var tip = rnd() > 0.55 ? Math.round((10000+rnd()*40000)/1000)*1000 : 0;
+      list.push({ id:uid(), type:'income', ts:d.getTime()+8*3600000+Math.floor(rnd()*10*3600000),
+        app:app, cash:cash, bank:bank, tip:tip, note:'', amount: app+cash+bank+tip });
+      if (rnd() > 0.5){
+        var cats = ['Xăng','Gửi xe','Ăn uống','Bảo dưỡng','Phí ứng dụng','Khác'];
+        var amt = Math.round((25000 + rnd()*180000)/1000)*1000;
+        list.push({ id:uid(), type:'expense', ts:d.getTime()+12*3600000+Math.floor(rnd()*8*3600000),
+          category:cats[Math.floor(rnd()*cats.length)], note:'', amount:amt });
+      }
+    }
+    return list;
+  }
+
+  function buildSeedMonthlyHistory(){
+    var rnd = seededRandom(4242);
+    var hist = {};
+    var today = startOfDay(new Date());
+    for (var i=11;i>=2;i--){
+      var d = new Date(today.getFullYear(), today.getMonth()-i, 1);
+      var key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      hist[key] = {
+        income: Math.round((17000000 + rnd()*9000000)/10000)*10000,
+        expense: Math.round((2800000 + rnd()*2200000)/10000)*10000
+      };
+    }
+    return hist;
+  }
+
+  function seedVehicle(){
+    var today = startOfDay(new Date());
+    function due(days){ return addDays(today, days).getTime(); }
+    return {
+      name:'Toyota Vios 2021',
+      plate:'51H1 - 234.56',
+      odometer:128460,
+      items:[
+        {id:'inspect', name:'Đăng kiểm', icon:'📋', due:due(18)},
+        {id:'insurance', name:'Bảo hiểm', icon:'🛡️', due:due(64)},
+        {id:'oil', name:'Thay nhớt', icon:'🛢️', due:due(6)},
+        {id:'brake', name:'Kiểm tra phanh', icon:'🛑', due:due(40)},
+        {id:'battery', name:'Ắc quy', icon:'🔋', due:due(-4)},
+        {id:'tires', name:'Lốp xe', icon:'🛞', due:due(90)}
+      ]
+    };
+  }
+
+  /* ================= state ================= */
+  var state = {
+    transactions: sGet('cuocso_transactions', null) || buildSeedTransactions(),
+    monthlyHistory: sGet('cuocso_monthly_history', null) || buildSeedMonthlyHistory(),
+    vehicle: sGet('cuocso_vehicle', null) || seedVehicle()
+  };
+  if (!sGet('cuocso_transactions', null)) sSet('cuocso_transactions', state.transactions);
+  if (!sGet('cuocso_monthly_history', null)) sSet('cuocso_monthly_history', state.monthlyHistory);
+  if (!sGet('cuocso_vehicle', null)) sSet('cuocso_vehicle', state.vehicle);
+
+  function persist(){
+    sSet('cuocso_transactions', state.transactions);
+    sSet('cuocso_vehicle', state.vehicle);
+    syncToFirebase();
+  }
+
+  /* ================= count-up ================= */
+  function countUp(el, target){
+    var start = parseFloat(el.dataset.raw || '0');
+    if (start === target){ el.textContent = fmtVND(target); return; }
+    var t0 = null, dur = 700;
+    function step(ts){
+      if (!t0) t0 = ts;
+      var p = Math.min((ts-t0)/dur, 1);
+      var eased = 1 - Math.pow(1-p, 3);
+      var val = start + (target-start)*eased;
+      el.textContent = fmtVND(val);
+      if (p < 1) requestAnimationFrame(step);
+      else { el.textContent = fmtVND(target); el.dataset.raw = target; }
+    }
+    requestAnimationFrame(step);
+  }
+
+  /* ================= aggregation ================= */
+  function sumRange(fromTs, toTs){
+    var income=0, expense=0;
+    state.transactions.forEach(function(tx){
+      if (tx.ts >= fromTs && tx.ts < toTs){
+        if (tx.type === 'income') income += tx.amount; else expense += tx.amount;
+      }
+    });
+    return {income:income, expense:expense};
+  }
+
+  function periodData(period){
+    var today = startOfDay(new Date());
+    var labels=[], income=[], expense=[], profit=[];
+    if (period === 'week'){
+      for (var i=6;i>=0;i--){
+        var d = addDays(today,-i);
+        var r = sumRange(d.getTime(), d.getTime()+dayMs());
+        labels.push(ddmm(d)); income.push(r.income); expense.push(r.expense); profit.push(r.income-r.expense);
+      }
+    } else if (period === 'month'){
+      for (var w=7; w>=0; w--){
+        var end = addDays(today, -w*7);
+        var start = addDays(end, -6);
+        var r2 = sumRange(startOfDay(start).getTime(), addDays(startOfDay(end),1).getTime());
+        labels.push(ddmm(start)+'-'+ddmm(end)); income.push(r2.income); expense.push(r2.expense); profit.push(r2.income-r2.expense);
+      }
+    } else {
+      for (var m=11; m>=0; m--){
+        var md = new Date(today.getFullYear(), today.getMonth()-m, 1);
+        var key = md.getFullYear()+'-'+String(md.getMonth()+1).padStart(2,'0');
+        var monthStart = new Date(md.getFullYear(), md.getMonth(), 1).getTime();
+        var monthEnd = new Date(md.getFullYear(), md.getMonth()+1, 1).getTime();
+        var r3 = sumRange(monthStart, monthEnd);
+        if (r3.income === 0 && r3.expense === 0 && state.monthlyHistory[key]){
+          r3 = state.monthlyHistory[key];
+        }
+        labels.push(monthNames[md.getMonth()]); income.push(r3.income); expense.push(r3.expense); profit.push(r3.income-r3.expense);
+      }
+    }
+    return {labels:labels, income:income, expense:expense, profit:profit};
+  }
+
+  /* ================= dashboard render ================= */
+  function greeting(){
+    var h = new Date().getHours();
+    if (h < 11) return 'Chào buổi sáng 👋';
+    if (h < 14) return 'Chào buổi trưa 👋';
+    if (h < 18) return 'Chào buổi chiều 👋';
+    return 'Chào buổi tối 👋';
+  }
+
+  function renderDashboard(){
+    document.getElementById('greetText').textContent = greeting();
+    var today = startOfDay(new Date());
+    var tr = sumRange(today.getTime(), today.getTime()+dayMs());
+    var monthStart = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
+    var yearStart = new Date(today.getFullYear(), 0, 1).getTime();
+    var mr = sumRange(monthStart, Date.now());
+    var yr = sumRange(yearStart, Date.now());
+
+    countUp(document.getElementById('kpiToday'), tr.income);
+    countUp(document.getElementById('kpiMonth'), mr.income);
+    countUp(document.getElementById('kpiYear'), yr.income);
+    countUp(document.getElementById('kpiProfit'), tr.income - tr.expense);
+    countUp(document.getElementById('chipToday'), tr.income);
+
+    /* recent transactions (dashboard, 5 items) */
+    renderTxInto(document.getElementById('recentTxList'), sortedTx().slice(0,5));
+
+    /* quick stats */
+    var r7 = sumRange(addDays(today,-6).getTime(), today.getTime()+dayMs());
+    var avg = r7.income/7;
+    document.getElementById('qsAvg').textContent = fmtVND(avg);
+    var incomeCount = state.transactions.filter(function(t){return t.type==='income';}).length;
+    document.getElementById('qsCount').textContent = incomeCount;
+    var best = 0;
+    for (var i=29;i>=0;i--){
+      var d = addDays(today,-i);
+      var rr = sumRange(d.getTime(), d.getTime()+dayMs());
+      if (rr.income > best) best = rr.income;
+    }
+    document.getElementById('qsBest').textContent = fmtVND(best);
+
+    renderVehicleWidgets();
+  }
+
+  function sortedTx(){
+    return state.transactions.slice().sort(function(a,b){ return b.ts - a.ts; });
+  }
+
+  function relativeDate(ts){
+    var d = new Date(ts), today = startOfDay(new Date());
+    var diffDays = Math.round((startOfDay(d).getTime() - today.getTime())/dayMs());
+    var time = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    if (diffDays === 0) return 'Hôm nay, '+time;
+    if (diffDays === -1) return 'Hôm qua, '+time;
+    return ddmm(d)+', '+time;
+  }
+
+  function txLabel(tx){
+    if (tx.type === 'income'){
+      var parts=[];
+      if (tx.app) parts.push('App');
+      if (tx.cash) parts.push('Tiền mặt');
+      if (tx.bank) parts.push('Chuyển khoản');
+      if (tx.tip) parts.push('Tip');
+      return tx.note ? tx.note : (parts.length ? parts.join(' · ') : 'Thu nhập');
+    }
+    return tx.note ? tx.category+' · '+tx.note : tx.category;
+  }
+
+  function renderTxInto(container, list){
+    container.innerHTML = '';
+    if (!list.length){
+      var wrap = document.createElement('div');
+      wrap.className = 'empty-illus';
+      wrap.innerHTML =
+        '<div class="glyph">🚕</div>' +
+        '<div class="t">Chưa có thu nhập nào được ghi</div>' +
+        '<div class="s">Bắt đầu bằng cách thêm cuốc xe đầu tiên trong ngày của anh.</div>' +
+        '<button class="btn btn-gold empty-cta">+ Thêm thu nhập</button>';
+      wrap.querySelector('.empty-cta').addEventListener('click', function(){ openIncomeModalForNew(); });
+      container.appendChild(wrap);
+      return;
+    }
+    list.forEach(function(tx){
+      var row = document.createElement('div');
+      row.className = 'tx-row';
+      row.style.cursor = 'pointer';
+      row.title = 'Bấm để sửa hoặc xóa';
+      row.innerHTML =
+        '<div class="tx-ic">'+(tx.type==='income' ? '💰' : '💸')+'</div>' +
+        '<div class="tx-mid"><div class="t">'+txLabel(tx)+'</div><div class="d">'+relativeDate(tx.ts)+'</div></div>' +
+        '<div class="tx-amt '+tx.type+'">'+(tx.type==='income'?'+':'−')+fmtVND(tx.amount)+'</div>' +
+        '<div style="font-size:12px; color:var(--ink-faint); margin-left:4px;">✎</div>';
+      row.addEventListener('click', function(){ openTxForEdit(tx.id); });
+      container.appendChild(row);
+    });
+  }
+
+  function openTxForEdit(txId){
+    var tx = state.transactions.find(function(t){ return t.id === txId; });
+    if (!tx) return;
+    editingTxId = txId;
+    if (tx.type === 'income'){
+      document.getElementById('incomeModalTitle').textContent = 'Sửa thu nhập';
+      document.getElementById('inApp').value = tx.app || '';
+      document.getElementById('inCash').value = tx.cash || '';
+      document.getElementById('inBank').value = tx.bank || '';
+      document.getElementById('inTip').value = tx.tip || '';
+      document.getElementById('inNote').value = tx.note || '';
+      updateIncomeTotal();
+      document.getElementById('deleteIncomeBtn').style.display = 'block';
+      document.getElementById('deleteIncomeBtn').dataset.confirm = '0';
+      document.getElementById('deleteIncomeBtn').textContent = '🗑 Xóa giao dịch này';
+      openModal('incomeModal');
+    } else {
+      document.getElementById('expenseModalTitle').textContent = 'Sửa chi phí';
+      document.getElementById('exAmount').value = tx.amount || '';
+      document.getElementById('exCategory').value = tx.category || 'Khác';
+      document.getElementById('exNote').value = tx.note || '';
+      document.getElementById('deleteExpenseBtn').style.display = 'block';
+      document.getElementById('deleteExpenseBtn').dataset.confirm = '0';
+      document.getElementById('deleteExpenseBtn').textContent = '🗑 Xóa giao dịch này';
+      openModal('expenseModal');
+    }
+  }
+
+  /* ================= vehicle ================= */
+  function toDateInputValue(ts){
+    if (ts == null) return '';
+    var d = new Date(ts);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+
+  function maintStatus(due){
+    if (due == null) return {cls:'unset', text:'Chưa cập nhật', days:null};
+    var days = Math.round((due - Date.now())/dayMs());
+    if (days < 0) return {cls:'overdue', text:'Quá hạn '+Math.abs(days)+' ngày', days:days};
+    if (days <= 7) return {cls:'soon', text:'Còn '+days+' ngày', days:days, urgent:true};
+    if (days <= 30) return {cls:'soon', text:'Còn '+days+' ngày', days:days};
+    return {cls:'ok', text:'Còn '+days+' ngày', days:days};
+  }
+
+  function vehicleHealth(){
+    var items = state.vehicle.items.filter(function(it){ return it.due != null; });
+    if (!items.length) return 0;
+    var total = 0;
+    items.forEach(function(it){
+      var st = maintStatus(it.due);
+      total += st.cls==='overdue' ? 20 : st.cls==='soon' ? 62 : 96;
+    });
+    return Math.round(total/items.length);
+  }
+
+  function setRing(el, pct){
+    var c = 2*Math.PI*42;
+    el.style.strokeDasharray = c;
+    el.style.strokeDashoffset = c - (c*pct/100);
+    el.style.stroke = pct===0 ? 'rgba(255,255,255,.25)' : pct < 40 ? 'var(--red)' : pct < 70 ? 'var(--gold)' : 'var(--green)';
+  }
+
+  function renderVehicleWidgets(){
+    var health = vehicleHealth();
+    setRing(document.getElementById('vehicleRing'), health);
+    document.getElementById('vehiclePct').textContent = health+'%';
+    var nm = state.vehicle.name || state.vehicle.plate ? [state.vehicle.name, state.vehicle.plate].filter(Boolean).join(' · ') : 'Chưa cập nhật thông tin xe';
+    document.getElementById('vehicleName').textContent = nm;
+
+    var withDate = state.vehicle.items.filter(function(it){ return it.due != null; })
+      .sort(function(a,b){ return a.due-b.due; });
+    var box = document.getElementById('upcomingMaint');
+    box.innerHTML = '';
+    if (!withDate.length){
+      box.innerHTML = '<div class="empty-state" style="padding:14px 4px;">Chưa có lịch bảo dưỡng nào. Thêm ở trang "Xe của tôi".</div>';
+    } else {
+      withDate.slice(0,3).forEach(function(it){
+        var st = maintStatus(it.due);
+        var row = document.createElement('div');
+        row.className = 'maint-row';
+        row.innerHTML = '<div class="tx-ic">'+it.icon+'</div><div class="tx-mid t" style="flex:1;">'+it.name+'</div><div class="badge '+st.cls+'">'+st.text+'</div>';
+        box.appendChild(row);
+      });
+    }
+
+    renderMaintAlert();
+  }
+
+  function renderMaintAlert(){
+    var banner = document.getElementById('maintAlertBanner');
+    var urgent = state.vehicle.items.filter(function(it){
+      var st = maintStatus(it.due);
+      return st.cls === 'overdue' || st.urgent;
+    });
+    if (!urgent.length){ banner.style.display = 'none'; return; }
+    var parts = urgent.map(function(it){
+      var st = maintStatus(it.due);
+      return it.name+' ('+st.text.toLowerCase()+')';
+    });
+    banner.style.display = 'flex';
+    banner.style.alignItems = 'center';
+    banner.style.gap = '10px';
+    banner.innerHTML = '<span style="font-size:18px;">🔔</span><span style="font-size:13.5px;"><b>Sắp đến hạn bảo dưỡng:</b> '+parts.join(', ')+'</span>';
+    banner.onclick = function(){ showPage('vehicle'); };
+  }
+
+  function checkMaintenanceNotifications(){
+    var urgent = state.vehicle.items.filter(function(it){
+      var st = maintStatus(it.due);
+      return st.cls === 'overdue' || st.urgent;
+    });
+    if (urgent.length){
+      toast('🔔 '+urgent.length+' hạng mục xe sắp/đã đến hạn bảo dưỡng');
+    }
+  }
+
+  var editingMaintId = null;
+  var editingTxId = null;
+  function renderVehiclePage(){
+    var health = vehicleHealth();
+    setRing(document.getElementById('vehicleRing2'), health);
+    document.getElementById('vehicleName2').textContent = state.vehicle.name || 'Chưa đặt tên xe';
+    document.getElementById('vehiclePlate').textContent = 'Biển số ' + (state.vehicle.plate || 'chưa cập nhật');
+    document.getElementById('vehicleOdo').textContent = (state.vehicle.odometer||0).toLocaleString('vi-VN')+' km';
+
+    var grid = document.getElementById('maintGrid');
+    grid.innerHTML = '';
+    state.vehicle.items.forEach(function(it){
+      var st = maintStatus(it.due);
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.style.padding = '18px';
+      card.style.cursor = 'pointer';
+      card.title = 'Bấm để nhập/sửa ngày đến hạn';
+      card.innerHTML =
+        '<div style="display:flex; align-items:center; gap:12px;">' +
+          '<div class="tx-ic" style="font-size:19px;">'+it.icon+'</div>' +
+          '<div style="flex:1;"><div style="font-weight:700; font-size:14.5px;">'+it.name+'</div>' +
+          '<div style="font-size:12px; color:var(--ink-faint); margin-top:2px;">'+(it.due!=null ? 'Hạn: '+ddmm(new Date(it.due)) : 'Bấm để nhập ngày') +'</div></div>' +
+          '<div class="badge '+st.cls+'">'+st.text+'</div>' +
+        '</div>';
+      card.addEventListener('click', function(){ openMaintDateModal(it.id); });
+      grid.appendChild(card);
+    });
+  }
+
+  function openMaintDateModal(itemId){
+    editingMaintId = itemId;
+    var item = state.vehicle.items.find(function(it){ return it.id === itemId; });
+    document.getElementById('maintDateTitle').textContent = 'Ngày đến hạn — '+item.name;
+    document.getElementById('mdDate').value = toDateInputValue(item.due);
+    document.getElementById('clearMaintDate').style.display = item.due != null ? 'block' : 'none';
+    openModal('maintDateModal');
+  }
+
+
+  /* ================= transactions page ================= */
+  var txFilter = 'all';
+  function renderTransactionsPage(){
+    var list = sortedTx();
+    if (txFilter !== 'all') list = list.filter(function(t){ return t.type === txFilter; });
+    renderTxInto(document.getElementById('fullTxList'), list);
+  }
+
+  /* ================= statistics / chart ================= */
+  var chartInstance = null;
+  var currentPeriod = 'week';
+  var chartJsLoading = false;
+
+  function ensureChartJs(cb){
+    if (window.Chart){ cb(); return; }
+    if (chartJsLoading){ setTimeout(function(){ ensureChartJs(cb); }, 120); return; }
+    chartJsLoading = true;
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js';
+    s.onload = function(){ chartJsLoading=false; cb(); };
+    s.onerror = function(){ chartJsLoading=false; document.querySelector('.chart-wrap').innerHTML = '<div class="empty-state">Không thể tải biểu đồ (mất kết nối mạng).</div>'; };
+    document.head.appendChild(s);
+  }
+
+  function renderStats(){
+    var chartWrap = document.querySelector('.chart-wrap');
+    if (!state.transactions.length){
+      document.getElementById('statIncome').textContent = fmtVND(0);
+      document.getElementById('statExpense').textContent = fmtVND(0);
+      document.getElementById('statProfit').textContent = fmtVND(0);
+      if (chartInstance){ chartInstance.destroy(); chartInstance = null; }
+      chartWrap.innerHTML = '<div class="empty-illus"><div class="glyph">📊</div>' +
+        '<div class="t">Chưa có dữ liệu thống kê</div>' +
+        '<div class="s">Thêm vài cuốc xe để biểu đồ bắt đầu vẽ nên bức tranh thu nhập của anh.</div>' +
+        '<button class="btn btn-gold empty-cta">+ Thêm thu nhập</button></div>';
+      chartWrap.querySelector('.empty-cta').addEventListener('click', function(){ openIncomeModalForNew(); });
+      return;
+    }
+    if (!document.getElementById('mainChart')){ chartWrap.innerHTML = '<canvas id="mainChart"></canvas>'; }
+
+    var data = periodData(currentPeriod);
+    var totalIncome = data.income.reduce(function(a,b){return a+b;},0);
+    var totalExpense = data.expense.reduce(function(a,b){return a+b;},0);
+    document.getElementById('statIncome').textContent = fmtVND(totalIncome);
+    document.getElementById('statExpense').textContent = fmtVND(totalExpense);
+    document.getElementById('statProfit').textContent = fmtVND(totalIncome-totalExpense);
+
+    ensureChartJs(function(){
+      var ctx = document.getElementById('mainChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        data:{
+          labels:data.labels,
+          datasets:[
+            { type:'bar', label:'Thu nhập', data:data.income, backgroundColor:'rgba(53,208,127,.75)', borderRadius:6, order:2 },
+            { type:'bar', label:'Chi phí', data:data.expense, backgroundColor:'rgba(255,107,107,.7)', borderRadius:6, order:2 },
+            { type:'line', label:'Lợi nhuận', data:data.profit, borderColor:'#f4b740', backgroundColor:'#f4b740', tension:.35, pointRadius:2, order:1 }
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          animation:{ duration:600 },
+          interaction:{ mode:'index', intersect:false },
+          plugins:{
+            legend:{ display:false },
+            tooltip:{ callbacks:{ label:function(c){ return c.dataset.label+': '+fmtVND(c.parsed.y); } } }
+          },
+          scales:{
+            x:{ ticks:{ color:'rgba(245,243,238,.55)', font:{family:"'Space Mono', monospace", size:10} }, grid:{ display:false } },
+            y:{ ticks:{ color:'rgba(245,243,238,.45)', callback:function(v){ return (v/1000000).toFixed(0)+'tr'; } }, grid:{ color:'rgba(255,255,255,.06)' } }
+          }
+        }
+      });
+    });
+  }
+
+  /* ================= navigation ================= */
+  var pageTitles = { dashboard:'Tổng quan', stats:'Thống kê', transactions:'Giao dịch', vehicle:'Xe của tôi' };
+  function showPage(name){
+    document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('page-'+name).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.toggle('active', n.dataset.page===name); });
+    document.querySelectorAll('.bn-item').forEach(function(n){ n.classList.toggle('active', n.dataset.page===name); });
+    document.getElementById('pageTitle').textContent = pageTitles[name];
+    document.getElementById('addExpenseBtnTop').style.display = name==='dashboard' ? '' : 'none';
+    if (name === 'stats') renderStats();
+    if (name === 'transactions') renderTransactionsPage();
+    if (name === 'vehicle') renderVehiclePage();
+    if (location.hash !== '#'+name) history.replaceState(null,'','#'+name);
+    window.scrollTo({top:0});
+  }
+
+  document.querySelectorAll('[data-page]').forEach(function(el){
+    el.addEventListener('click', function(){ showPage(el.dataset.page); });
+  });
+  document.querySelectorAll('[data-nav]').forEach(function(el){
+    el.addEventListener('click', function(){ showPage(el.dataset.nav); });
+  });
+
+  document.getElementById('periodTabs').addEventListener('click', function(e){
+    var btn = e.target.closest('.tab'); if (!btn) return;
+    document.querySelectorAll('#periodTabs .tab').forEach(function(t){ t.classList.remove('active'); });
+    btn.classList.add('active');
+    currentPeriod = btn.dataset.period;
+    renderStats();
+  });
+  document.getElementById('txFilters').addEventListener('click', function(e){
+    var btn = e.target.closest('.tab'); if (!btn) return;
+    document.querySelectorAll('#txFilters .tab').forEach(function(t){ t.classList.remove('active'); });
+    btn.classList.add('active');
+    txFilter = btn.dataset.filter;
+    renderTransactionsPage();
+  });
+
+  /* ================= modals ================= */
+  function openModal(id){ document.getElementById(id).classList.add('open'); document.body.classList.add('scroll-hidden'); }
+  function closeModal(id){ document.getElementById(id).classList.remove('open'); document.body.classList.remove('scroll-hidden'); }
+
+  document.querySelectorAll('.modal-backdrop').forEach(function(bd){
+    if (bd.id === 'authGate') return; /* mandatory gate — no dismiss-on-outside-click */
+    bd.addEventListener('click', function(e){ if (e.target === bd) closeModal(bd.id); });
+    bd.querySelectorAll('[data-close]').forEach(function(btn){ btn.addEventListener('click', function(){ closeModal(bd.id); }); });
+  });
+
+  function openIncomeModalForNew(){
+    editingTxId = null;
+    document.getElementById('incomeModalTitle').textContent = 'Thêm thu nhập';
+    ['inApp','inCash','inBank','inTip','inNote'].forEach(function(id){ document.getElementById(id).value=''; });
+    updateIncomeTotal();
+    document.getElementById('deleteIncomeBtn').style.display = 'none';
+    openModal('incomeModal');
+  }
+  function openExpenseModalForNew(){
+    editingTxId = null;
+    document.getElementById('expenseModalTitle').textContent = 'Thêm chi phí';
+    document.getElementById('exAmount').value = '';
+    document.getElementById('exCategory').selectedIndex = 0;
+    document.getElementById('exNote').value = '';
+    document.getElementById('deleteExpenseBtn').style.display = 'none';
+    openModal('expenseModal');
+  }
+  ['addIncomeBtnTop','bannerAddIncome','qaIncome','fabAdd'].forEach(function(id){
+    document.getElementById(id).addEventListener('click', openIncomeModalForNew);
+  });
+  ['addExpenseBtnTop','qaExpense'].forEach(function(id){
+    document.getElementById(id).addEventListener('click', openExpenseModalForNew);
+  });
+
+  document.getElementById('openSettings').addEventListener('click', function(){ openModal('settingsModal'); });
+  document.getElementById('openResetConfirm').addEventListener('click', function(){
+    closeModal('settingsModal');
+    setTimeout(function(){ openModal('resetConfirmModal'); }, 180);
+  });
+
+  document.getElementById('editVehicleInfoBtn').addEventListener('click', function(){
+    document.getElementById('vfName').value = state.vehicle.name || '';
+    document.getElementById('vfPlate').value = state.vehicle.plate || '';
+    document.getElementById('vfOdo').value = state.vehicle.odometer || '';
+    openModal('vehicleInfoModal');
+  });
+  document.getElementById('saveVehicleInfo').addEventListener('click', function(){
+    state.vehicle.name = document.getElementById('vfName').value.trim();
+    state.vehicle.plate = document.getElementById('vfPlate').value.trim();
+    state.vehicle.odometer = parseFloat(document.getElementById('vfOdo').value) || 0;
+    persist();
+    closeModal('vehicleInfoModal');
+    toast('Đã lưu thông tin xe');
+    renderVehiclePage();
+    renderVehicleWidgets();
+  });
+
+  document.getElementById('saveMaintDate').addEventListener('click', function(){
+    var val = document.getElementById('mdDate').value;
+    var item = state.vehicle.items.find(function(it){ return it.id === editingMaintId; });
+    if (!item) return;
+    item.due = val ? new Date(val+'T00:00:00').getTime() : null;
+    persist();
+    closeModal('maintDateModal');
+    toast('Đã lưu ngày bảo dưỡng');
+    renderVehiclePage();
+    renderVehicleWidgets();
+  });
+
+  document.getElementById('clearMaintDate').addEventListener('click', function(){
+    var item = state.vehicle.items.find(function(it){ return it.id === editingMaintId; });
+    if (!item) return;
+    item.due = null;
+    persist();
+    closeModal('maintDateModal');
+    toast('Đã xóa ngày bảo dưỡng');
+    renderVehiclePage();
+    renderVehicleWidgets();
+  });
+
+  function freshVehicle(){
+    return {
+      name:'', plate:'', odometer:0,
+      items:[
+        {id:'inspect', name:'Đăng kiểm', icon:'📋', due:null},
+        {id:'insurance', name:'Bảo hiểm', icon:'🛡️', due:null},
+        {id:'oil', name:'Thay nhớt', icon:'🛢️', due:null},
+        {id:'brake', name:'Kiểm tra phanh', icon:'🛑', due:null},
+        {id:'battery', name:'Ắc quy', icon:'🔋', due:null},
+        {id:'tires', name:'Lốp xe', icon:'🛞', due:null}
+      ]
+    };
+  }
+
+  function resetAllData(){
+    try{ localStorage.removeItem('cuocso_transactions'); }catch(e){}
+    try{ localStorage.removeItem('cuocso_monthly_history'); }catch(e){}
+    try{ localStorage.removeItem('cuocso_vehicle'); }catch(e){}
+    memoryFallback = {};
+
+    state.transactions = [];
+    state.monthlyHistory = {};
+    state.vehicle = freshVehicle();
+    persist();
+    sSet('cuocso_monthly_history', state.monthlyHistory);
+
+    if (chartInstance){ chartInstance.destroy(); chartInstance = null; }
+    txFilter = 'all';
+    document.querySelectorAll('#txFilters .tab').forEach(function(t,i){ t.classList.toggle('active', i===0); });
+    document.querySelectorAll('#periodTabs .tab').forEach(function(t,i){ t.classList.toggle('active', i===0); });
+    currentPeriod = 'week';
+
+    closeModal('resetConfirmModal');
+    refreshCurrentPage();
+    toast('Đã đặt lại toàn bộ dữ liệu');
+  }
+  document.getElementById('confirmReset').addEventListener('click', resetAllData);
+
+  function updateIncomeTotal(){
+    var v = (parseFloat(document.getElementById('inApp').value)||0)
+          + (parseFloat(document.getElementById('inCash').value)||0)
+          + (parseFloat(document.getElementById('inBank').value)||0)
+          + (parseFloat(document.getElementById('inTip').value)||0);
+    document.getElementById('inTotal').textContent = fmtVND(v);
+  }
+  ['inApp','inCash','inBank','inTip'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', updateIncomeTotal);
+  });
+
+  function spawnMoneyParticles(originEl, symbol){
+    if (reduceMotion) return;
+    var rect = originEl.getBoundingClientRect();
+    var cx = rect.left + rect.width/2, cy = rect.top;
+    for (var i=0;i<6;i++){
+      var p = document.createElement('div');
+      p.className = 'money-particle';
+      p.textContent = symbol;
+      p.style.left = cx+'px';
+      p.style.top = cy+'px';
+      p.style.setProperty('--mx', (Math.random()*70-35)+'px');
+      p.style.animationDelay = (Math.random()*0.15)+'s';
+      document.body.appendChild(p);
+      (function(el){ setTimeout(function(){ el.remove(); }, 1400); })(p);
+    }
+  }
+
+  function toast(msg){
+    var el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = '<span>✓</span>'+msg;
+    document.getElementById('toastHost').appendChild(el);
+    setTimeout(function(){ el.remove(); }, 2500);
+  }
+
+  document.getElementById('saveIncome').addEventListener('click', function(){
+    var app = parseFloat(document.getElementById('inApp').value)||0;
+    var cash = parseFloat(document.getElementById('inCash').value)||0;
+    var bank = parseFloat(document.getElementById('inBank').value)||0;
+    var tip = parseFloat(document.getElementById('inTip').value)||0;
+    var note = document.getElementById('inNote').value.trim();
+    var total = app+cash+bank+tip;
+    if (total <= 0){ toast('Vui lòng nhập số tiền'); return; }
+    if (editingTxId){
+      var existing = state.transactions.find(function(t){ return t.id === editingTxId; });
+      if (existing){
+        existing.app = app; existing.cash = cash; existing.bank = bank; existing.tip = tip;
+        existing.note = note; existing.amount = total;
+      }
+    } else {
+      state.transactions.push({ id:uid(), type:'income', ts:Date.now(), app:app, cash:cash, bank:bank, tip:tip, note:note, amount:total });
+    }
+    persist();
+    editingTxId = null;
+    ['inApp','inCash','inBank','inTip','inNote'].forEach(function(id){ document.getElementById(id).value=''; });
+    updateIncomeTotal();
+    spawnMoneyParticles(document.getElementById('saveIncome'), '+₫');
+    closeModal('incomeModal');
+    toast('Đã lưu thu nhập '+fmtVND(total));
+    refreshCurrentPage();
+  });
+
+  document.getElementById('saveExpense').addEventListener('click', function(){
+    var amt = parseFloat(document.getElementById('exAmount').value)||0;
+    var cat = document.getElementById('exCategory').value;
+    var note = document.getElementById('exNote').value.trim();
+    if (amt <= 0){ toast('Vui lòng nhập số tiền'); return; }
+    if (editingTxId){
+      var existingEx = state.transactions.find(function(t){ return t.id === editingTxId; });
+      if (existingEx){ existingEx.category = cat; existingEx.note = note; existingEx.amount = amt; }
+    } else {
+      state.transactions.push({ id:uid(), type:'expense', ts:Date.now(), category:cat, note:note, amount:amt });
+    }
+    persist();
+    editingTxId = null;
+    document.getElementById('exAmount').value=''; document.getElementById('exNote').value='';
+    spawnMoneyParticles(document.getElementById('saveExpense'), '−₫');
+    closeModal('expenseModal');
+    toast('Đã lưu chi phí '+fmtVND(amt));
+    refreshCurrentPage();
+  });
+
+  function wireTxDelete(btnId, closeModalId){
+    var btn = document.getElementById(btnId);
+    var revertTimer = null;
+    btn.addEventListener('click', function(){
+      if (btn.dataset.confirm === '1'){
+        clearTimeout(revertTimer);
+        state.transactions = state.transactions.filter(function(t){ return t.id !== editingTxId; });
+        persist();
+        editingTxId = null;
+        btn.dataset.confirm = '0';
+        btn.textContent = '🗑 Xóa giao dịch này';
+        closeModal(closeModalId);
+        toast('Đã xóa giao dịch');
+        refreshCurrentPage();
+      } else {
+        btn.dataset.confirm = '1';
+        btn.textContent = 'Bấm lần nữa để xác nhận xóa';
+        revertTimer = setTimeout(function(){ btn.dataset.confirm='0'; btn.textContent='🗑 Xóa giao dịch này'; }, 3000);
+      }
+    });
+  }
+  wireTxDelete('deleteIncomeBtn', 'incomeModal');
+  wireTxDelete('deleteExpenseBtn', 'expenseModal');
+
+  function refreshCurrentPage(){
+    var active = document.querySelector('.page.active').id.replace('page-','');
+    renderDashboard();
+    if (active === 'stats') renderStats();
+    if (active === 'transactions') renderTransactionsPage();
+    if (active === 'vehicle') renderVehiclePage();
+  }
+
+  /* ================= Firebase cloud sync (optional — configure FIREBASE_CONFIG below) ================= */
+  /* Paste your own Firebase Web config here. Until apiKey is filled in, CuocSo runs 100%
+     locally on this browser exactly as before — no login screen, no network calls. */
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAU-X7VV_RznsN3CDzypEdqmCDCYdfH9rs",
+    authDomain: "thongkethunhap-a770a.firebaseapp.com",
+    databaseURL: "https://thongkethunhap-a770a-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "thongkethunhap-a770a",
+    storageBucket: "thongkethunhap-a770a.firebasestorage.app",
+    messagingSenderId: "118931308088",
+    appId: "1:118931308088:web:bd62fa9af4d1e46c86f0cd",
+    measurementId: "G-D67RFX3V1R"
+  };
+  var firebaseEnabled = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf('YOUR_') !== 0);
+  var fbAuth = null, fbDb = null, fbUser = null, authMode = 'login';
+
+  function loadFirebaseSdk(cb){
+    var urls = [
+      'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
+      'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
+      'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js'
+    ];
+    var i = 0;
+    function next(){
+      if (i >= urls.length){ cb(); return; }
+      var s = document.createElement('script');
+      s.src = urls[i];
+      s.onload = function(){ i++; next(); };
+      s.onerror = function(){ toast('⚠️ Không tải được Firebase — kiểm tra kết nối mạng'); };
+      document.head.appendChild(s);
+    }
+    next();
+  }
+
+  function initFirebase(){
+    if (!firebaseEnabled) return;
+    loadFirebaseSdk(function(){
+      firebase.initializeApp(FIREBASE_CONFIG);
+      fbAuth = firebase.auth();
+      fbDb = firebase.database();
+      document.getElementById('settingsInfo').textContent = 'CuốcSố đồng bộ dữ liệu của anh lên Firebase — đăng nhập cùng một tài khoản trên điện thoại và máy tính để thấy cùng một dữ liệu.';
+      fbAuth.onAuthStateChanged(function(user){
+        fbUser = user;
+        updateAccountUi();
+        if (user){
+          hideAuthGate();
+          loadFromFirebase();
+        } else {
+          showAuthGate();
+        }
+      });
+    });
+  }
+
+  function showAuthGate(){ document.getElementById('authGate').classList.add('open'); document.body.classList.add('scroll-hidden'); }
+  function hideAuthGate(){ document.getElementById('authGate').classList.remove('open'); document.body.classList.remove('scroll-hidden'); }
+
+  function showAuthError(msg){
+    var el = document.getElementById('authError');
+    el.textContent = msg; el.style.display = 'block';
+  }
+  function clearAuthError(){ document.getElementById('authError').style.display = 'none'; }
+
+  var authErrorMap = {
+    'auth/invalid-email':'Email không hợp lệ.',
+    'auth/user-not-found':'Không tìm thấy tài khoản với email này.',
+    'auth/wrong-password':'Sai mật khẩu.',
+    'auth/email-already-in-use':'Email này đã được đăng ký, hãy đăng nhập.',
+    'auth/weak-password':'Mật khẩu cần tối thiểu 6 ký tự.',
+    'auth/invalid-credential':'Email hoặc mật khẩu không đúng.',
+    'auth/missing-password':'Vui lòng nhập mật khẩu.',
+    'auth/too-many-requests':'Thử lại quá nhiều lần, vui lòng đợi một chút rồi thử lại.'
+  };
+  function friendlyAuthError(err){ return authErrorMap[err.code] || err.message; }
+
+  document.getElementById('authToggleLink').addEventListener('click', function(e){
+    e.preventDefault();
+    authMode = authMode === 'login' ? 'register' : 'login';
+    clearAuthError();
+    document.getElementById('authSubmit').textContent = authMode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản';
+    document.getElementById('authSubtitle').textContent = authMode === 'login'
+      ? 'Đăng nhập để đồng bộ dữ liệu của anh trên mọi thiết bị.'
+      : 'Tạo tài khoản mới để bắt đầu lưu trữ trên đám mây.';
+    document.getElementById('authToggleText').textContent = authMode === 'login' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?';
+    document.getElementById('authToggleLink').textContent = authMode === 'login' ? 'Đăng ký ngay' : 'Đăng nhập';
+  });
+
+  document.getElementById('authForgotLink').addEventListener('click', function(e){
+    e.preventDefault();
+    var email = document.getElementById('authEmail').value.trim();
+    if (!email){ showAuthError('Nhập email trước để nhận link đặt lại mật khẩu.'); return; }
+    fbAuth.sendPasswordResetEmail(email).then(function(){
+      showAuthError('Đã gửi email đặt lại mật khẩu, kiểm tra hộp thư nhé.');
+    }).catch(function(err){ showAuthError(friendlyAuthError(err)); });
+  });
+
+  document.getElementById('authSubmit').addEventListener('click', function(){
+    clearAuthError();
+    var email = document.getElementById('authEmail').value.trim();
+    var pass = document.getElementById('authPassword').value;
+    if (!email || !pass){ showAuthError('Nhập đầy đủ email và mật khẩu.'); return; }
+    var action = authMode === 'login'
+      ? fbAuth.signInWithEmailAndPassword(email, pass)
+      : fbAuth.createUserWithEmailAndPassword(email, pass);
+    action.catch(function(err){ showAuthError(friendlyAuthError(err)); });
+  });
+
+  function updateAccountUi(){
+    var zone = document.getElementById('accountZone');
+    var status = document.getElementById('accountStatus');
+    var logoutBtn = document.getElementById('logoutBtn');
+    if (!firebaseEnabled){ zone.style.display = 'none'; return; }
+    zone.style.display = 'block';
+    if (fbUser){
+      status.textContent = 'Đã đồng bộ với ' + fbUser.email;
+      logoutBtn.style.display = 'block';
+    } else {
+      status.textContent = 'Chưa đăng nhập.';
+      logoutBtn.style.display = 'none';
+    }
+  }
+  document.getElementById('logoutBtn').addEventListener('click', function(){ fbAuth.signOut(); });
+
+  function syncToFirebase(){
+    if (!firebaseEnabled || !fbUser || !fbDb) return;
+    fbDb.ref('users/'+fbUser.uid).set({
+      transactions: state.transactions,
+      monthlyHistory: state.monthlyHistory,
+      vehicle: state.vehicle,
+      updatedAt: Date.now()
+    }).catch(function(err){ console.error('Firebase sync error', err); toast('⚠️ Không thể đồng bộ lên đám mây'); });
+  }
+
+  function loadFromFirebase(){
+    fbDb.ref('users/'+fbUser.uid).once('value').then(function(snap){
+      var data = snap.val();
+      if (data){
+        state.transactions = data.transactions || [];
+        state.monthlyHistory = data.monthlyHistory || {};
+        state.vehicle = data.vehicle || freshVehicle();
+        sSet('cuocso_transactions', state.transactions);
+        sSet('cuocso_monthly_history', state.monthlyHistory);
+        sSet('cuocso_vehicle', state.vehicle);
+        toast('☁️ Đã đồng bộ dữ liệu từ đám mây');
+      } else {
+        /* first login on this account: push whatever is currently on this device as the starting point */
+        syncToFirebase();
+      }
+      if (chartInstance){ chartInstance.destroy(); chartInstance = null; }
+      refreshCurrentPage();
+    }).catch(function(err){
+      console.error('Firebase load error', err);
+      toast('⚠️ Không tải được dữ liệu đám mây, đang dùng dữ liệu cục bộ');
+    });
+  }
+
+  /* ================= living background: day/night + weather + traffic ================= */
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var root2 = document.documentElement.style;
+
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function clamp01(v){ return Math.min(1,Math.max(0,v)); }
+  function smooth(e0,e1,x){ var t=clamp01((x-e0)/(e1-e0)); return t*t*(3-2*t); }
+  function hexRgb(h){ var v=parseInt(h.slice(1),16); return [(v>>16)&255,(v>>8)&255,v&255]; }
+  function rgba(hex,a){ var c=hexRgb(hex); return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'; }
+  function toHex2(n){ return Math.round(n).toString(16).padStart(2,'0'); }
+  function lerpHex(h1,h2,t){ var a=hexRgb(h1),b=hexRgb(h2); return '#'+toHex2(lerp(a[0],b[0],t))+toHex2(lerp(a[1],b[1],t))+toHex2(lerp(a[2],b[2],t)); }
+
+  function buildAmbientStars(){
+    var box = document.getElementById('ambientStars');
+    var n = window.innerWidth < 640 ? 26 : 46;
+    for (var i=0;i<n;i++){
+      var s = document.createElement('div');
+      s.className = 'st';
+      var size = (Math.random()*1.6+.8).toFixed(1);
+      s.style.width = size+'px'; s.style.height = size+'px';
+      s.style.left = (Math.random()*100)+'%';
+      s.style.top = (Math.random()*100)+'%';
+      s.style.animationDelay = (Math.random()*4).toFixed(2)+'s';
+      box.appendChild(s);
+    }
+  }
+  function buildAmbientParticles(){
+    var box = document.getElementById('ambientParticles');
+    var n = 10;
+    for (var i=0;i<n;i++){
+      var m = document.createElement('div');
+      m.className = 'mote';
+      m.style.left = (Math.random()*100)+'%';
+      m.style.animationDuration = (14+Math.random()*10)+'s';
+      m.style.animationDelay = (-Math.random()*20)+'s';
+      box.appendChild(m);
+    }
+  }
+
+  var CYCLE_MS = 240000; /* 4 minutes = one full illustrative day, purely decorative */
+  var CYCLE_OFFSET = CYCLE_MS * 0.32; /* start the app looking like a bright, welcoming afternoon */
+  var lastBgUpdate = 0;
+
+  function dayNightTick(ts){
+    if (!reduceMotion){
+      if (ts - lastBgUpdate > 90){ /* throttle to ~11fps, colors change slowly so this stays smooth */
+        lastBgUpdate = ts;
+        var t = (((performance.now() + CYCLE_OFFSET) % CYCLE_MS) / CYCLE_MS);
+
+        /* global ambient tint — kept subtle so it never distracts */
+        var tintA = t < 0.88 ? lerpHex('#f4b740','#5a6bd6', smooth(0.55,0.85,t)) : lerpHex('#5a6bd6','#f4b740', smooth(0.9,1.0,t));
+        var tintB = lerpHex('#5aa9ff','#2a1f5c', smooth(0.6,0.9,t));
+        root2.setProperty('--sky-tint-a', rgba(tintA, 0.13));
+        root2.setProperty('--sky-tint-b', rgba(tintB, 0.11));
+        root2.setProperty('--star-op', smooth(0.66,0.85,t) * 0.6);
+
+        /* banner sun/moon arc: low-left morning -> top-center midday -> low-right evening -> moon at night */
+        var sunP = clamp01(t/0.76);
+        var sunArc = Math.sin(sunP*Math.PI);
+        root2.setProperty('--sun-x', (8 + sunP*84)+'%');
+        root2.setProperty('--sun-y', (86 - sunArc*74)+'%');
+        root2.setProperty('--sun-op', 1 - smooth(0.68,0.82,t));
+
+        var moonP = clamp01((t-0.66)/0.34);
+        var moonArc = Math.sin(moonP*Math.PI);
+        root2.setProperty('--moon-x', (10 + moonP*80)+'%');
+        root2.setProperty('--moon-y', (82 - moonArc*68)+'%');
+        root2.setProperty('--moon-op', smooth(0.68,0.82,t));
+
+        root2.setProperty('--headlight-op', smooth(0.66,0.8,t));
+        root2.setProperty('--street-op', smooth(0.68,0.84,t));
+      }
+    }
+    requestAnimationFrame(dayNightTick);
+  }
+
+  /* ---- occasional passing traffic in the header banner ---- */
+  var trafficGlyphs = [
+    {em:'🛵', w:26, spd:[7,10]},
+    {em:'🚕', w:46, spd:[9,13]},
+    {em:'🚗', w:44, spd:[9,13]},
+    {em:'🚚', w:54, spd:[12,17]}
+  ];
+  function spawnTraffic(){
+    var strip = document.getElementById('roadStrip');
+    if (strip){
+      var existing = strip.querySelectorAll('.traffic-veh').length;
+      if (existing < 1){ /* keep the lane uncluttered — never more than one passer-by at a time */
+        var g = trafficGlyphs[Math.floor(Math.random()*trafficGlyphs.length)];
+        var el = document.createElement('div');
+        el.className = 'traffic-veh';
+        var reverse = Math.random() > 0.5;
+        var dur = g.spd[0] + Math.random()*(g.spd[1]-g.spd[0]);
+        el.style.width = g.w+'px';
+        el.style.bottom = (2+Math.random()*6)+'px';
+        el.style.animation = (reverse ? 'drive-once-rev' : 'drive-once') + ' ' + dur + 's linear 1';
+        el.innerHTML = '<span class="em" style="font-size:'+g.w+'px; transform:scaleX('+(reverse?-1:1)+')">'+g.em+'</span>';
+        strip.appendChild(el);
+        el.addEventListener('animationend', function(){ el.remove(); });
+        setTimeout(function(){ if (el.parentNode) el.remove(); }, (dur+1)*1000);
+      }
+    }
+    scheduleTraffic();
+  }
+  function scheduleTraffic(){
+    if (reduceMotion) return;
+    setTimeout(spawnTraffic, 9000 + Math.random()*11000);
+  }
+
+  /* ---- occasional birds / plane / leaf in the banner sky ---- */
+  function spawnSkyThing(kind, cssClass, glyph, durRange, maxConcurrent){
+    var sky = document.getElementById('bannerSky');
+    if (!sky) return;
+    if (sky.querySelectorAll('.'+cssClass).length >= maxConcurrent) return; /* avoid overlapping duplicates */
+    var el = document.createElement('div');
+    el.className = cssClass;
+    el.textContent = glyph;
+    el.style.animationDuration = (durRange[0] + Math.random()*(durRange[1]-durRange[0])) + 's';
+    sky.appendChild(el);
+    el.addEventListener('animationend', function(){ el.remove(); });
+  }
+  function scheduleSky(){
+    if (reduceMotion) return;
+    setTimeout(function(){ spawnSkyThing('bird','banner-bird','🐦',[8,12],1); scheduleSky(); }, 16000 + Math.random()*16000);
+  }
+  function schedulePlane(){
+    if (reduceMotion) return;
+    setTimeout(function(){ spawnSkyThing('plane','banner-plane','✈️',[16,22],1); schedulePlane(); }, 45000 + Math.random()*40000);
+  }
+  function scheduleLeaf(){
+    if (reduceMotion) return;
+    setTimeout(function(){ spawnSkyThing('leaf','banner-leaf','🍃',[6,9],1); scheduleLeaf(); }, 12000 + Math.random()*12000);
+  }
+
+  function startLivingBackground(){
+    buildAmbientStars();
+    buildAmbientParticles();
+    if (reduceMotion){
+      /* fixed, pleasant, static state — no continuous motion */
+      root2.setProperty('--sun-op','1'); root2.setProperty('--moon-op','0'); root2.setProperty('--star-op','0');
+      root2.setProperty('--sun-x','60%'); root2.setProperty('--sun-y','18%');
+      return;
+    }
+    requestAnimationFrame(dayNightTick);
+    scheduleTraffic();
+    scheduleSky();
+    schedulePlane();
+    scheduleLeaf();
+  }
+
+  /* ================= init ================= */
+  function setDate(){
+    var d = new Date();
+    var wd = ['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'][d.getDay()];
+    document.getElementById('pageDate').textContent = wd+', '+ddmm(d)+'/'+d.getFullYear();
+  }
+
+  setDate();
+  renderDashboard();
+  startLivingBackground();
+  initFirebase();
+  setTimeout(checkMaintenanceNotifications, 900);
+  var initial = (location.hash||'').replace('#','');
+  if (['dashboard','stats','transactions','vehicle'].indexOf(initial) === -1) initial = 'dashboard';
+  showPage(initial);
+
+})();
+</script>
+</body>
+</html>

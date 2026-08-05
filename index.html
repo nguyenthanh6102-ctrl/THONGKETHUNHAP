@@ -1323,15 +1323,29 @@
   var currentPeriod = 'week';
   var chartJsLoading = false;
 
+  var chartJsSources = [
+    'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js',
+    'https://unpkg.com/chart.js@4.4.4/dist/chart.umd.min.js'
+  ];
   function ensureChartJs(cb){
     if (window.Chart){ cb(); return; }
     if (chartJsLoading){ setTimeout(function(){ ensureChartJs(cb); }, 120); return; }
     chartJsLoading = true;
-    var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js';
-    s.onload = function(){ chartJsLoading=false; cb(); };
-    s.onerror = function(){ chartJsLoading=false; document.querySelector('.chart-wrap').innerHTML = '<div class="empty-state">Không thể tải biểu đồ (mất kết nối mạng).</div>'; };
-    document.head.appendChild(s);
+    var idx = 0;
+    function tryNext(){
+      if (idx >= chartJsSources.length){
+        chartJsLoading = false;
+        document.querySelector('.chart-wrap').innerHTML = '<div class="empty-state">Không thể tải biểu đồ (mất kết nối mạng hoặc trình duyệt đang chặn CDN).</div>';
+        return;
+      }
+      var s = document.createElement('script');
+      s.src = chartJsSources[idx];
+      s.onload = function(){ chartJsLoading = false; cb(); };
+      s.onerror = function(){ s.remove(); idx++; tryNext(); };
+      document.head.appendChild(s);
+    }
+    tryNext();
   }
 
   function renderStats(){

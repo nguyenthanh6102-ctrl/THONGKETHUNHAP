@@ -345,6 +345,28 @@
   .tx-amt{ font-size:14.5px; font-weight:700; white-space:nowrap; }
   .tx-amt.income{ color:var(--green); }
   .tx-amt.expense{ color:var(--red); }
+
+  /* ---- day-grouped accordion (Transactions page) ---- */
+  .day-group{ border-bottom:1px solid var(--border); }
+  .day-group:last-child{ border-bottom:none; }
+  .day-header{
+    display:flex; align-items:center; gap:12px;
+    padding:16px 4px; cursor:pointer;
+    transition:background .2s ease;
+    border-radius:10px;
+  }
+  .day-header:hover{ background:var(--glass); }
+  .day-info{ flex:1; min-width:0; }
+  .day-title{ font-size:14.5px; font-weight:800; }
+  .day-sub{ font-size:12px; color:var(--ink-faint); margin-top:2px; }
+  .day-totals{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; font-family:var(--font-mono); font-size:12.5px; font-weight:700; }
+  .dt-income{ color:var(--green); }
+  .dt-expense{ color:var(--red); }
+  .day-chevron{ font-size:13px; color:var(--ink-faint); transition:transform .25s ease; margin-left:2px; }
+  .day-header.open .day-chevron{ transform:rotate(180deg); color:var(--gold-soft); }
+  .day-body{ padding:0 4px 8px 4px; }
+  .day-body .tx-row{ padding-left:14px; }
+
   .empty-state{ padding:30px 10px; text-align:center; color:var(--ink-faint); font-size:13.5px; }
   .empty-illus{
     display:flex; flex-direction:column; align-items:center; text-align:center;
@@ -666,7 +688,7 @@
 
           <div class="row-grid row-2">
             <div class="card rv d2" style="padding:20px 22px;">
-              <div class="section-title">Giao dịch gần đây <span class="link" data-nav="transactions">Xem tất cả</span></div>
+              <div class="section-title">Giao dịch hôm nay <span class="link" data-nav="transactions">Xem tất cả</span></div>
               <div class="tx-list" id="recentTxList"></div>
             </div>
             <div class="stack">
@@ -1080,8 +1102,9 @@
     countUp(document.getElementById('kpiProfit'), tr.income - tr.expense);
     countUp(document.getElementById('chipToday'), tr.income);
 
-    /* recent transactions (dashboard, 5 items) */
-    renderTxInto(document.getElementById('recentTxList'), sortedTx().slice(0,5));
+    /* recent transactions on dashboard = today only, keeps the page clean day to day */
+    var todayTx = sortedTx().filter(function(t){ return t.ts >= today.getTime(); });
+    renderTxInto(document.getElementById('recentTxList'), todayTx);
 
     /* quick stats */
     var r7 = sumRange(addDays(today,-6).getTime(), today.getTime()+dayMs());
@@ -1125,32 +1148,97 @@
     return tx.note ? tx.category+' · '+tx.note : tx.category;
   }
 
+  function buildEmptyTxIllus(){
+    var wrap = document.createElement('div');
+    wrap.className = 'empty-illus';
+    wrap.innerHTML =
+      '<div class="glyph">🚕</div>' +
+      '<div class="t">Chưa có thu nhập nào được ghi</div>' +
+      '<div class="s">Bắt đầu bằng cách thêm cuốc xe đầu tiên trong ngày của anh.</div>' +
+      '<button class="btn btn-gold empty-cta">+ Thêm thu nhập</button>';
+    wrap.querySelector('.empty-cta').addEventListener('click', function(){ openIncomeModalForNew(); });
+    return wrap;
+  }
+
+  function buildTxRow(tx){
+    var row = document.createElement('div');
+    row.className = 'tx-row';
+    row.style.cursor = 'pointer';
+    row.title = 'Bấm để sửa hoặc xóa';
+    row.innerHTML =
+      '<div class="tx-ic">'+(tx.type==='income' ? '💰' : '💸')+'</div>' +
+      '<div class="tx-mid"><div class="t">'+txLabel(tx)+'</div><div class="d">'+relativeDate(tx.ts)+'</div></div>' +
+      '<div class="tx-amt '+tx.type+'">'+(tx.type==='income'?'+':'−')+fmtVND(tx.amount)+'</div>' +
+      '<div style="font-size:12px; color:var(--ink-faint); margin-left:4px;">✎</div>';
+    row.addEventListener('click', function(){ openTxForEdit(tx.id); });
+    return row;
+  }
+
   function renderTxInto(container, list){
     container.innerHTML = '';
-    if (!list.length){
-      var wrap = document.createElement('div');
-      wrap.className = 'empty-illus';
-      wrap.innerHTML =
-        '<div class="glyph">🚕</div>' +
-        '<div class="t">Chưa có thu nhập nào được ghi</div>' +
-        '<div class="s">Bắt đầu bằng cách thêm cuốc xe đầu tiên trong ngày của anh.</div>' +
-        '<button class="btn btn-gold empty-cta">+ Thêm thu nhập</button>';
-      wrap.querySelector('.empty-cta').addEventListener('click', function(){ openIncomeModalForNew(); });
-      container.appendChild(wrap);
-      return;
-    }
+    if (!list.length){ container.appendChild(buildEmptyTxIllus()); return; }
+    list.forEach(function(tx){ container.appendChild(buildTxRow(tx)); });
+  }
+
+  function dayLabel(dayKey){
+    var todayKey = isoDay(new Date());
+    var yesterdayKey = isoDay(addDays(new Date(),-1));
+    if (dayKey === todayKey) return 'Hôm nay';
+    if (dayKey === yesterdayKey) return 'Hôm qua';
+    var p = dayKey.split('-');
+    var d = new Date(+p[0], +p[1]-1, +p[2]);
+    var wd = ['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'][d.getDay()];
+    return wd+', '+ddmm(d)+'/'+p[0];
+  }
+
+  /* Transactions page: grouped by day, collapsed by default — bấm vào ngày để xem chi tiết */
+  function renderTransactionsGrouped(container, list){
+    container.innerHTML = '';
+    if (!list.length){ container.appendChild(buildEmptyTxIllus()); return; }
+
+    var groups = {}, order = [];
     list.forEach(function(tx){
-      var row = document.createElement('div');
-      row.className = 'tx-row';
-      row.style.cursor = 'pointer';
-      row.title = 'Bấm để sửa hoặc xóa';
-      row.innerHTML =
-        '<div class="tx-ic">'+(tx.type==='income' ? '💰' : '💸')+'</div>' +
-        '<div class="tx-mid"><div class="t">'+txLabel(tx)+'</div><div class="d">'+relativeDate(tx.ts)+'</div></div>' +
-        '<div class="tx-amt '+tx.type+'">'+(tx.type==='income'?'+':'−')+fmtVND(tx.amount)+'</div>' +
-        '<div style="font-size:12px; color:var(--ink-faint); margin-left:4px;">✎</div>';
-      row.addEventListener('click', function(){ openTxForEdit(tx.id); });
-      container.appendChild(row);
+      var key = isoDay(tx.ts);
+      if (!groups[key]){ groups[key] = []; order.push(key); }
+      groups[key].push(tx);
+    });
+    order.sort().reverse();
+
+    order.forEach(function(key, idx){
+      var dayTx = groups[key].slice().sort(function(a,b){ return b.ts-a.ts; });
+      var incomeSum = 0, expenseSum = 0;
+      dayTx.forEach(function(t){ if (t.type==='income') incomeSum += t.amount; else expenseSum += t.amount; });
+
+      var group = document.createElement('div');
+      group.className = 'day-group';
+
+      var header = document.createElement('div');
+      header.className = 'day-header';
+      header.innerHTML =
+        '<div class="day-info"><div class="day-title">'+dayLabel(key)+'</div><div class="day-sub">'+dayTx.length+' giao dịch</div></div>' +
+        '<div class="day-totals">' +
+          (incomeSum > 0 ? '<span class="dt-income">+'+fmtVND(incomeSum)+'</span>' : '') +
+          (expenseSum > 0 ? '<span class="dt-expense">−'+fmtVND(expenseSum)+'</span>' : '') +
+        '</div>' +
+        '<div class="day-chevron">▾</div>';
+
+      var body = document.createElement('div');
+      body.className = 'day-body';
+      dayTx.forEach(function(tx){ body.appendChild(buildTxRow(tx)); });
+
+      var expanded = idx === 0; /* ngày gần nhất mở sẵn, các ngày cũ hơn thu gọn cho trang đỡ dài */
+      body.style.display = expanded ? 'block' : 'none';
+      if (expanded) header.classList.add('open');
+
+      header.addEventListener('click', function(){
+        var isOpen = body.style.display !== 'none';
+        body.style.display = isOpen ? 'none' : 'block';
+        header.classList.toggle('open', !isOpen);
+      });
+
+      group.appendChild(header);
+      group.appendChild(body);
+      container.appendChild(group);
     });
   }
 
@@ -1315,7 +1403,7 @@
   function renderTransactionsPage(){
     var list = sortedTx();
     if (txFilter !== 'all') list = list.filter(function(t){ return t.type === txFilter; });
-    renderTxInto(document.getElementById('fullTxList'), list);
+    renderTransactionsGrouped(document.getElementById('fullTxList'), list);
   }
 
   /* ================= statistics / chart ================= */
